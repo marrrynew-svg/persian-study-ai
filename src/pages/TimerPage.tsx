@@ -3,10 +3,11 @@ import { motion } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useSubjects } from "@/hooks/useSubjects";
 import { useSaveSession } from "@/hooks/useStudySessions";
+import { useAddXP, useAwardBadge, useWeeklyChallenges, BADGE_DEFINITIONS } from "@/hooks/useGamification";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Play, Pause, Square, RotateCcw, Maximize2 } from "lucide-react";
+import { Play, Pause, Square, RotateCcw, Maximize2, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 
@@ -15,6 +16,9 @@ type TimerMode = "pomodoro" | "custom";
 export default function TimerPage() {
   const { data: subjects = [] } = useSubjects();
   const saveSession = useSaveSession();
+  const addXP = useAddXP();
+  const awardBadge = useAwardBadge();
+  const { updateChallenge } = useWeeklyChallenges();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -26,6 +30,7 @@ export default function TimerPage() {
   const [remainingSeconds, setRemainingSeconds] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [isBreak, setIsBreak] = useState(false);
+  const [sessionsCompleted, setSessionsCompleted] = useState(0);
   const startedAtRef = useRef<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -47,6 +52,27 @@ export default function TimerPage() {
     }
   }, [workMin, mode]);
 
+  const handleSessionComplete = async (durationMin: number, sType: string) => {
+    const xpEarned = Math.round(durationMin * 2); // 2 XP per minute
+    await saveSession.mutateAsync({
+      subject_id: subjectId || null,
+      duration_minutes: durationMin,
+      session_type: sType,
+      started_at: startedAtRef.current!,
+      ended_at: new Date().toISOString(),
+    });
+    await addXP.mutateAsync(xpEarned);
+    await updateChallenge.mutateAsync({ challenge_type: "sessions", increment: 1 });
+    await updateChallenge.mutateAsync({ challenge_type: "study_hours", increment: Math.round(durationMin / 60) });
+    
+    // Award first session badge
+    if (sessionsCompleted === 0) {
+      await awardBadge.mutateAsync(BADGE_DEFINITIONS.find(b => b.badge_type === "first_session")!);
+    }
+    setSessionsCompleted(prev => prev + 1);
+    toast({ title: `🎉 آفرین! +${xpEarned} XP کسب کردی` });
+  };
+
   useEffect(() => {
     if (!isRunning) {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -61,22 +87,13 @@ export default function TimerPage() {
       setRemainingSeconds((prev) => {
         if (prev <= 1) {
           if (mode === "pomodoro" && !isBreak) {
-            // Save work session then start break
-            saveSession.mutate({
-              subject_id: subjectId || null,
-              duration_minutes: workMin,
-              session_type: "pomodoro",
-              started_at: startedAtRef.current!,
-              ended_at: new Date().toISOString(),
-            });
-            toast({ title: "🎉 آفرین! زمان استراحت" });
+            handleSessionComplete(workMin, "pomodoro");
             setIsBreak(true);
             startedAtRef.current = new Date().toISOString();
             const breakSecs = breakMin * 60;
             setTotalSeconds(breakSecs);
             return breakSecs;
           } else {
-            // Break finished or custom mode done
             setIsRunning(false);
             if (isBreak) {
               toast({ title: "استراحت تمام شد! ادامه بده 💪" });
@@ -87,14 +104,7 @@ export default function TimerPage() {
               return workSecs;
             }
             if (mode === "custom") {
-              saveSession.mutate({
-                subject_id: subjectId || null,
-                duration_minutes: Math.round(totalSeconds / 60),
-                session_type: "custom",
-                started_at: startedAtRef.current!,
-                ended_at: new Date().toISOString(),
-              });
-              toast({ title: "جلسه ذخیره شد ✅" });
+              handleSessionComplete(Math.round(totalSeconds / 60), "custom");
               startedAtRef.current = null;
             }
             return 0;
@@ -104,21 +114,21 @@ export default function TimerPage() {
       });
     }, 1000);
 
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [isRunning, mode, isBreak, workMin, breakMin, subjectId, totalSeconds]);
 
   const progress = totalSeconds > 0 ? ((totalSeconds - remainingSeconds) / totalSeconds) * 100 : 0;
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
 
-  // Circle dimensions
   const size = 240;
-  const stroke = 8;
+  const stroke = 10;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference - (progress / 100) * circumference;
+
+  const xpPerMin = 2;
+  const minutesElapsed = totalSeconds > 0 ? Math.round((totalSeconds - remainingSeconds) / 60) : 0;
 
   return (
     <AppLayout>
@@ -132,19 +142,11 @@ export default function TimerPage() {
 
         {/* Mode toggle */}
         <div className="flex gap-2">
-          <Button
-            variant={mode === "pomodoro" ? "default" : "ghost"}
-            onClick={() => { setMode("pomodoro"); resetTimer(); }}
-            className="flex-1 rounded-xl"
-          >
-            پومودورو
+          <Button variant={mode === "pomodoro" ? "default" : "ghost"} onClick={() => { setMode("pomodoro"); resetTimer(); }} className="flex-1 rounded-xl">
+            🍅 پومودورو
           </Button>
-          <Button
-            variant={mode === "custom" ? "default" : "ghost"}
-            onClick={() => { setMode("custom"); setTotalSeconds(30 * 60); setRemainingSeconds(30 * 60); }}
-            className="flex-1 rounded-xl"
-          >
-            آزاد
+          <Button variant={mode === "custom" ? "default" : "ghost"} onClick={() => { setMode("custom"); setTotalSeconds(30 * 60); setRemainingSeconds(30 * 60); }} className="flex-1 rounded-xl">
+            ⏱ آزاد
           </Button>
         </div>
 
@@ -155,14 +157,12 @@ export default function TimerPage() {
           </SelectTrigger>
           <SelectContent>
             {subjects.map((s: any) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.icon} {s.name}
-              </SelectItem>
+              <SelectItem key={s.id} value={s.id}>{s.icon} {s.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        {/* Timer settings */}
+        {/* Pomodoro settings */}
         {mode === "pomodoro" && !isRunning && (
           <div className="flex gap-3">
             <Card className="glass rounded-xl p-3 flex-1 text-center">
@@ -185,12 +185,12 @@ export default function TimerPage() {
         )}
 
         {/* Circular timer */}
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="flex flex-col items-center"
-        >
+        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex flex-col items-center">
           <div className="relative" style={{ width: size, height: size }}>
+            {/* Background glow */}
+            {isRunning && !isBreak && (
+              <div className="absolute inset-8 rounded-full blur-2xl opacity-20 gradient-primary animate-pulse-gentle" />
+            )}
             <svg width={size} height={size} className="-rotate-90">
               <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} />
               <circle
@@ -210,7 +210,23 @@ export default function TimerPage() {
               <span className="text-4xl font-bold tabular-nums" dir="ltr">
                 {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
               </span>
-              {isBreak && <span className="text-xs text-secondary mt-1">استراحت</span>}
+              {isBreak ? (
+                <span className="text-sm text-emerald mt-1 font-medium">⛅ استراحت</span>
+              ) : isRunning ? (
+                <div className="flex items-center gap-1 mt-1">
+                  <Zap className="w-3 h-3 text-accent" />
+                  <span className="text-xs text-accent">+{minutesElapsed * xpPerMin} XP</span>
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground mt-1">{mode === "pomodoro" ? "پومودورو" : "آزاد"}</span>
+              )}
+              {sessionsCompleted > 0 && (
+                <div className="flex gap-1 mt-2">
+                  {Array.from({ length: Math.min(sessionsCompleted, 4) }).map((_, i) => (
+                    <div key={i} className="w-2 h-2 rounded-full bg-accent" />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </motion.div>
@@ -222,7 +238,7 @@ export default function TimerPage() {
           </Button>
           <Button
             size="icon"
-            className="rounded-full h-16 w-16 gradient-primary text-primary-foreground shadow-lg"
+            className="rounded-full h-16 w-16 gradient-primary text-primary-foreground shadow-lg shadow-primary/30"
             onClick={() => setIsRunning(!isRunning)}
           >
             {isRunning ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 mr-0.5" />}
@@ -235,14 +251,7 @@ export default function TimerPage() {
               if (isRunning && startedAtRef.current) {
                 const elapsed = Math.round((Date.now() - new Date(startedAtRef.current).getTime()) / 60000);
                 if (elapsed > 0) {
-                  saveSession.mutate({
-                    subject_id: subjectId || null,
-                    duration_minutes: elapsed,
-                    session_type: mode,
-                    started_at: startedAtRef.current,
-                    ended_at: new Date().toISOString(),
-                  });
-                  toast({ title: "جلسه ذخیره شد ✅" });
+                  handleSessionComplete(elapsed, mode);
                 }
               }
               resetTimer();
@@ -251,6 +260,16 @@ export default function TimerPage() {
             <Square className="w-5 h-5" />
           </Button>
         </div>
+
+        {/* XP hint */}
+        {!isRunning && (
+          <Card className="glass rounded-xl p-3">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <Zap className="w-3.5 h-3.5 text-accent" />
+              <span>هر دقیقه مطالعه = {xpPerMin} XP کسب می‌کنی</span>
+            </div>
+          </Card>
+        )}
       </div>
     </AppLayout>
   );

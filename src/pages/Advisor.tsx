@@ -5,9 +5,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useSubjects } from "@/hooks/useSubjects";
 import { useStudySessions } from "@/hooks/useStudySessions";
+import { useAwardBadge, BADGE_DEFINITIONS } from "@/hooks/useGamification";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, Sparkles, Loader2, AlertTriangle } from "lucide-react";
+import { Brain, Sparkles, Loader2, AlertTriangle, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,6 +17,7 @@ export default function Advisor() {
   const { data: profile } = useProfile();
   const { data: subjects = [] } = useSubjects();
   const { data: sessions = [] } = useStudySessions(30);
+  const awardBadge = useAwardBadge();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);
@@ -65,6 +67,9 @@ export default function Advisor() {
 
       if (!res.ok || !res.body) throw new Error("Failed");
 
+      // Award badge on first use
+      await awardBadge.mutateAsync(BADGE_DEFINITIONS.find(b => b.badge_type === "ai_advisor")!);
+
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -103,78 +108,71 @@ export default function Advisor() {
 
   return (
     <AppLayout>
-      <div className="px-4 pt-6 pb-4 max-w-lg mx-auto space-y-5">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-xl gradient-accent flex items-center justify-center">
-            <Brain className="w-5 h-5 text-accent-foreground" />
+      <div className="px-4 pt-6 pb-4 max-w-lg mx-auto space-y-4">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl gradient-accent flex items-center justify-center shadow-lg">
+            <Brain className="w-6 h-6 text-accent-foreground" />
           </div>
           <div>
             <h1 className="text-xl font-bold">مشاور هوشمند</h1>
-            <p className="text-xs text-muted-foreground">مبتنی بر هوش مصنوعی</p>
+            <p className="text-xs text-muted-foreground">powered by Gemini AI 🤖</p>
           </div>
         </div>
 
-        {/* Mode selector */}
-        <div className="flex gap-2">
-          <Button
-            variant={mode === "daily" ? "default" : "ghost"}
-            onClick={() => setMode("daily")}
-            className="flex-1 rounded-xl text-xs"
-            size="sm"
-          >
-            برنامه روزانه
-          </Button>
-          <Button
-            variant={mode === "emergency" ? "default" : "ghost"}
-            onClick={() => setMode("emergency")}
-            className="flex-1 rounded-xl text-xs"
-            size="sm"
-          >
-            <AlertTriangle className="w-3 h-3 ml-1" />
-            فوری
-          </Button>
-          <Button
-            variant={mode === "insight" ? "default" : "ghost"}
-            onClick={() => setMode("insight")}
-            className="flex-1 rounded-xl text-xs"
-            size="sm"
-          >
-            تحلیل عملکرد
-          </Button>
+        {/* Mode cards */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { id: "daily", icon: "📅", label: "برنامه روزانه", desc: "بهینه‌سازی مطالعه" },
+            { id: "emergency", icon: "⚡", label: "فوری!", desc: "آزمون فرداست" },
+            { id: "insight", icon: "📊", label: "تحلیل", desc: "عملکرد هفتگی" },
+          ].map(m => (
+            <button
+              key={m.id}
+              onClick={() => setMode(m.id as any)}
+              className={`p-3 rounded-2xl text-center transition-all border ${mode === m.id ? "border-primary bg-primary/10" : "border-border glass"}`}
+            >
+              <div className="text-2xl mb-1">{m.icon}</div>
+              <p className="text-[11px] font-semibold">{m.label}</p>
+              <p className="text-[10px] text-muted-foreground">{m.desc}</p>
+            </button>
+          ))}
         </div>
 
         {/* Generate button */}
-        <Button
-          onClick={getAdvice}
-          disabled={loading}
-          className="w-full h-12 rounded-2xl gradient-primary text-primary-foreground"
-        >
-          {loading ? (
-            <Loader2 className="w-5 h-5 animate-spin ml-2" />
-          ) : (
-            <Sparkles className="w-5 h-5 ml-2" />
-          )}
-          {loading ? "در حال تحلیل..." : mode === "daily" ? "ساخت برنامه روزانه" : mode === "emergency" ? "برنامه فوری!" : "تحلیل عملکرد"}
+        <Button onClick={getAdvice} disabled={loading} className="w-full h-13 rounded-2xl gradient-primary text-primary-foreground shadow-lg shadow-primary/20">
+          {loading ? <Loader2 className="w-5 h-5 animate-spin ml-2" /> : <Sparkles className="w-5 h-5 ml-2" />}
+          {loading ? "در حال تحلیل با AI..." : mode === "daily" ? "🗓 ساخت برنامه روزانه" : mode === "emergency" ? "🚨 برنامه اضطراری!" : "📊 تحلیل عملکرد"}
         </Button>
 
-        {/* Response */}
+        {/* Response streaming */}
         {response && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <Card className="glass rounded-2xl p-4">
-              <div className="prose prose-sm max-w-none text-foreground leading-relaxed whitespace-pre-wrap text-sm">
+              <div className="flex items-center gap-2 mb-3 pb-3 border-b border-border/50">
+                <Brain className="w-4 h-4 text-accent" />
+                <span className="text-xs font-semibold text-accent">پاسخ مشاور AI</span>
+              </div>
+              <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
                 {response}
+                {loading && <span className="inline-block w-1.5 h-4 bg-accent animate-pulse ml-1 rounded-sm" />}
               </div>
             </Card>
           </motion.div>
         )}
 
         {!response && !loading && (
-          <Card className="glass rounded-2xl p-6 text-center">
-            <Sparkles className="w-10 h-10 mx-auto text-accent mb-3" />
+          <Card className="glass rounded-2xl p-8 text-center">
+            <div className="text-5xl mb-3">🤖</div>
+            <p className="font-semibold mb-1">
+              {mode === "daily" ? "برنامه روزانه هوشمند" : mode === "emergency" ? "حالت اضطراری!" : "تحلیل عملکرد"}
+            </p>
             <p className="text-sm text-muted-foreground">
               {subjects.length === 0
                 ? "ابتدا دروس خود را در بخش مدیریت دروس اضافه کنید"
-                : "یکی از حالت‌ها را انتخاب کنید و دکمه را بزنید"}
+                : mode === "emergency"
+                  ? "AI یک برنامه فشرده برای آزمون فردا می‌سازد"
+                  : "AI با تحلیل دروس و جلسات شما برنامه شخصی می‌سازد"}
             </p>
           </Card>
         )}
@@ -182,3 +180,4 @@ export default function Advisor() {
     </AppLayout>
   );
 }
+

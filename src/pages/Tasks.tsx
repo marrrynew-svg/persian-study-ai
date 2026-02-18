@@ -3,12 +3,13 @@ import { motion } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useTasks, useAddTask, useToggleTask, useDeleteTask } from "@/hooks/useTasks";
 import { useSubjects } from "@/hooks/useSubjects";
+import { useAddXP, useAwardBadge, useWeeklyChallenges, BADGE_DEFINITIONS } from "@/hooks/useGamification";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, ListTodo, X } from "lucide-react";
+import { Plus, Trash2, ListTodo, X, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,9 @@ export default function Tasks() {
   const addTask = useAddTask();
   const toggleTask = useToggleTask();
   const deleteTask = useDeleteTask();
+  const addXP = useAddXP();
+  const awardBadge = useAwardBadge();
+  const { updateChallenge } = useWeeklyChallenges();
   const { toast } = useToast();
 
   const [showAdd, setShowAdd] = useState(false);
@@ -28,14 +32,24 @@ export default function Tasks() {
 
   const handleAdd = async () => {
     if (!title.trim()) return;
-    await addTask.mutateAsync({
-      title,
-      priority,
-      subject_id: subjectId || undefined,
-    });
+    await addTask.mutateAsync({ title, priority, subject_id: subjectId || undefined });
     setTitle("");
     setShowAdd(false);
     toast({ title: "وظیفه اضافه شد ✅" });
+  };
+
+  const handleToggle = async (task: any, completed: boolean) => {
+    await toggleTask.mutateAsync({ id: task.id, completed });
+    if (completed) {
+      const xp = task.priority === "high" ? 30 : task.priority === "low" ? 10 : 20;
+      await addXP.mutateAsync(xp);
+      await updateChallenge.mutateAsync({ challenge_type: "tasks", increment: 1 });
+      const completedCount = tasks.filter((t: any) => t.completed).length + 1;
+      if (completedCount >= 10) {
+        await awardBadge.mutateAsync(BADGE_DEFINITIONS.find(b => b.badge_type === "task_hero")!);
+      }
+      toast({ title: `✅ وظیفه انجام شد! +${xp} XP` });
+    }
   };
 
   const pending = tasks.filter((t: any) => !t.completed);
@@ -106,15 +120,16 @@ export default function Tasks() {
                 {pending.map((task: any, i: number) => (
                   <motion.div key={task.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}>
                     <Card className="glass rounded-xl p-3 flex items-center gap-3">
-                      <Checkbox
-                        checked={false}
-                        onCheckedChange={() => toggleTask.mutate({ id: task.id, completed: true })}
-                      />
+                      <Checkbox checked={false} onCheckedChange={() => handleToggle(task, true)} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{task.title}</p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span className={priorityColor(task.priority)}>{priorityLabel(task.priority)}</span>
                           {task.subjects && <span>• {task.subjects.icon} {task.subjects.name}</span>}
+                          <div className="flex items-center gap-0.5 text-accent">
+                            <Zap className="w-2.5 h-2.5" />
+                            <span>{task.priority === "high" ? 30 : task.priority === "low" ? 10 : 20} XP</span>
+                          </div>
                         </div>
                       </div>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteTask.mutate(task.id)}>
@@ -132,10 +147,7 @@ export default function Tasks() {
                 <div className="space-y-2">
                   {completed.map((task: any) => (
                     <Card key={task.id} className="glass rounded-xl p-3 flex items-center gap-3 opacity-60">
-                      <Checkbox
-                        checked={true}
-                        onCheckedChange={() => toggleTask.mutate({ id: task.id, completed: false })}
-                      />
+                      <Checkbox checked={true} onCheckedChange={() => handleToggle(task, false)} />
                       <p className="text-sm line-through flex-1 truncate">{task.title}</p>
                     </Card>
                   ))}
