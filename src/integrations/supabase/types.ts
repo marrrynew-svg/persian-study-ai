@@ -38,6 +38,112 @@ export type Database = {
         }
         Relationships: []
       }
+      badges: {
+        Row: {
+          badge_emoji: string
+          badge_name: string
+          badge_type: string
+          description: string | null
+          earned_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          badge_emoji?: string
+          badge_name: string
+          badge_type: string
+          description?: string | null
+          earned_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          badge_emoji?: string
+          badge_name?: string
+          badge_type?: string
+          description?: string | null
+          earned_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      group_members: {
+        Row: {
+          display_name: string | null
+          group_id: string
+          id: string
+          joined_at: string
+          role: string
+          total_xp: number
+          user_id: string
+          weekly_minutes: number
+        }
+        Insert: {
+          display_name?: string | null
+          group_id: string
+          id?: string
+          joined_at?: string
+          role?: string
+          total_xp?: number
+          user_id: string
+          weekly_minutes?: number
+        }
+        Update: {
+          display_name?: string | null
+          group_id?: string
+          id?: string
+          joined_at?: string
+          role?: string
+          total_xp?: number
+          user_id?: string
+          weekly_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "study_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_messages: {
+        Row: {
+          content: string
+          created_at: string
+          display_name: string | null
+          group_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          display_name?: string | null
+          group_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          display_name?: string | null
+          group_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "study_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       performance_logs: {
         Row: {
           completion_rate: number | null
@@ -232,6 +338,45 @@ export type Database = {
           },
         ]
       }
+      study_groups: {
+        Row: {
+          created_at: string
+          description: string | null
+          emoji: string
+          field_of_study: string | null
+          id: string
+          invite_code: string
+          is_public: boolean | null
+          max_members: number | null
+          name: string
+          owner_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          emoji?: string
+          field_of_study?: string | null
+          id?: string
+          invite_code?: string
+          is_public?: boolean | null
+          max_members?: number | null
+          name: string
+          owner_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          emoji?: string
+          field_of_study?: string | null
+          id?: string
+          invite_code?: string
+          is_public?: boolean | null
+          max_members?: number | null
+          name?: string
+          owner_id?: string
+        }
+        Relationships: []
+      }
       study_sessions: {
         Row: {
           completed: boolean | null
@@ -356,12 +501,87 @@ export type Database = {
           },
         ]
       }
+      user_xp: {
+        Row: {
+          created_at: string
+          id: string
+          last_study_date: string | null
+          level: number
+          streak_days: number
+          total_study_minutes: number
+          updated_at: string
+          user_id: string
+          xp_points: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_study_date?: string | null
+          level?: number
+          streak_days?: number
+          total_study_minutes?: number
+          updated_at?: string
+          user_id: string
+          xp_points?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_study_date?: string | null
+          level?: number
+          streak_days?: number
+          total_study_minutes?: number
+          updated_at?: string
+          user_id?: string
+          xp_points?: number
+        }
+        Relationships: []
+      }
+      weekly_challenges: {
+        Row: {
+          challenge_type: string
+          completed: boolean
+          created_at: string
+          current_value: number
+          id: string
+          target_value: number
+          user_id: string
+          week_start: string
+          xp_reward: number
+        }
+        Insert: {
+          challenge_type: string
+          completed?: boolean
+          created_at?: string
+          current_value?: number
+          id?: string
+          target_value: number
+          user_id: string
+          week_start: string
+          xp_reward?: number
+        }
+        Update: {
+          challenge_type?: string
+          completed?: boolean
+          created_at?: string
+          current_value?: number
+          id?: string
+          target_value?: number
+          user_id?: string
+          week_start?: string
+          xp_reward?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_group_member: {
+        Args: { _group_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

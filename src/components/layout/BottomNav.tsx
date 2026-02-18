@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Timer, CalendarDays, Brain, User } from "lucide-react";
+import { Home, Timer, CalendarDays, Brain, User, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -7,6 +7,7 @@ const navItems = [
   { path: "/", icon: Home, label: "خانه" },
   { path: "/timer", icon: Timer, label: "تایمر" },
   { path: "/planner", icon: CalendarDays, label: "برنامه" },
+  { path: "/groups", icon: Users, label: "گروه‌ها" },
   { path: "/advisor", icon: Brain, label: "مشاور" },
   { path: "/profile", icon: User, label: "پروفایل" },
 ];
@@ -16,7 +17,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-border/50">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
+      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-1">
         {navItems.map(({ path, icon: Icon, label }) => {
           const isActive = pathname === path;
           return (
@@ -24,7 +25,7 @@ export function BottomNav() {
               key={path}
               to={path}
               className={cn(
-                "flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-colors relative",
+                "flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-colors relative",
                 isActive ? "text-primary" : "text-muted-foreground"
               )}
             >
@@ -36,7 +37,7 @@ export function BottomNav() {
                 />
               )}
               <Icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium">{label}</span>
+              <span className="text-[9px] font-medium">{label}</span>
             </Link>
           );
         })}

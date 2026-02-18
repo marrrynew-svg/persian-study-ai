@@ -14,6 +14,7 @@ import Tasks from "./pages/Tasks";
 import FocusMode from "./pages/FocusMode";
 import Advisor from "./pages/Advisor";
 import Profile from "./pages/Profile";
+import Groups from "./pages/Groups";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -55,6 +56,7 @@ function AppRoutes() {
       <Route path="/focus" element={<ProtectedRoute><FocusMode /></ProtectedRoute>} />
       <Route path="/advisor" element={<ProtectedRoute><Advisor /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/groups" element={<ProtectedRoute><Groups /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
