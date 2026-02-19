@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useSubjects } from "@/hooks/useSubjects";
 import { useSaveSession } from "@/hooks/useStudySessions";
-import { useAddXP, useAwardBadge, useWeeklyChallenges, BADGE_DEFINITIONS } from "@/hooks/useGamification";
+import { useAddXP, useAwardBadge, useWeeklyChallenges, useUpdateStreak, useUserXP, BADGE_DEFINITIONS } from "@/hooks/useGamification";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,7 +17,9 @@ export default function TimerPage() {
   const { data: subjects = [] } = useSubjects();
   const saveSession = useSaveSession();
   const addXP = useAddXP();
+  const updateStreak = useUpdateStreak();
   const awardBadge = useAwardBadge();
+  const { data: xp } = useUserXP();
   const { updateChallenge } = useWeeklyChallenges();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -61,16 +63,29 @@ export default function TimerPage() {
       started_at: startedAtRef.current!,
       ended_at: new Date().toISOString(),
     });
+
+    // Update streak — checks last_study_date automatically
+    const streakResult = await updateStreak.mutateAsync();
+
     await addXP.mutateAsync(xpEarned);
     await updateChallenge.mutateAsync({ challenge_type: "sessions", increment: 1 });
     await updateChallenge.mutateAsync({ challenge_type: "study_hours", increment: Math.round(durationMin / 60) });
-    
+
     // Award first session badge
     if (sessionsCompleted === 0) {
       await awardBadge.mutateAsync(BADGE_DEFINITIONS.find(b => b.badge_type === "first_session")!);
     }
+
+    // Streak milestone badges
+    const currentStreak = (streakResult as any)?.streak || 0;
+    if (currentStreak >= 3) await awardBadge.mutateAsync(BADGE_DEFINITIONS.find(b => b.badge_type === "streak_3")!).catch(() => {});
+    if (currentStreak >= 7) await awardBadge.mutateAsync(BADGE_DEFINITIONS.find(b => b.badge_type === "streak_7")!).catch(() => {});
+
     setSessionsCompleted(prev => prev + 1);
-    toast({ title: `🎉 آفرین! +${xpEarned} XP کسب کردی` });
+
+    const streakMsg = (streakResult as any)?.isNewDay && (streakResult as any)?.streak > 1
+      ? ` 🔥 استریک ${(streakResult as any).streak} روزه!` : "";
+    toast({ title: `🎉 آفرین! +${xpEarned} XP کسب کردی${streakMsg}` });
   };
 
   useEffect(() => {

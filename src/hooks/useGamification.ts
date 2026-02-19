@@ -159,6 +159,58 @@ export function useWeeklyChallenges() {
 }
 
 // XP thresholds for levels
+export function useUpdateStreak() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!user) return;
+      const { data: existing } = await supabase
+        .from("user_xp" as any)
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const today = new Date().toISOString().split("T")[0];
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+
+      if (!existing) {
+        // Create initial record
+        await supabase.from("user_xp" as any).insert({
+          user_id: user.id,
+          xp_points: 0,
+          level: 1,
+          streak_days: 1,
+          last_study_date: today,
+          total_study_minutes: 0,
+        });
+        return { streak: 1, isNewDay: true };
+      }
+
+      const lastDate = (existing as any).last_study_date;
+
+      // Already studied today — no streak update needed
+      if (lastDate === today) return { streak: (existing as any).streak_days, isNewDay: false };
+
+      let newStreak = 1;
+      if (lastDate === yesterday) {
+        // Consecutive day — increment
+        newStreak = ((existing as any).streak_days || 0) + 1;
+      }
+      // Otherwise streak resets to 1 (missed a day)
+
+      await supabase
+        .from("user_xp" as any)
+        .update({ streak_days: newStreak, last_study_date: today })
+        .eq("user_id", user.id);
+
+      return { streak: newStreak, isNewDay: true };
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["user_xp"] }),
+  });
+}
+
 export function getLevelInfo(xp: number) {
   const level = Math.floor(xp / 500) + 1;
   const currentLevelXP = (level - 1) * 500;

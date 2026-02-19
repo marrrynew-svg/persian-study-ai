@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_conversations: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          mode: string | null
+          role: string
+          session_id: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          mode?: string | null
+          role: string
+          session_id?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          mode?: string | null
+          role?: string
+          session_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_recommendations: {
         Row: {
           content: Json
@@ -35,6 +68,45 @@ export type Database = {
           id?: string
           type?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      ai_user_memory: {
+        Row: {
+          category: string
+          confidence: number | null
+          created_at: string
+          id: string
+          key: string
+          memory_type: string
+          source: string | null
+          updated_at: string
+          user_id: string
+          value: string
+        }
+        Insert: {
+          category: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          key: string
+          memory_type?: string
+          source?: string | null
+          updated_at?: string
+          user_id: string
+          value: string
+        }
+        Update: {
+          category?: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          key?: string
+          memory_type?: string
+          source?: string | null
+          updated_at?: string
+          user_id?: string
+          value?: string
         }
         Relationships: []
       }
@@ -64,6 +136,57 @@ export type Database = {
           description?: string | null
           earned_at?: string
           id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      behavioral_snapshots: {
+        Row: {
+          ai_notes: string | null
+          avg_session_length: number | null
+          burnout_risk: number | null
+          consistency_score: number | null
+          created_at: string
+          emotional_signals: Json | null
+          id: string
+          motivation_score: number | null
+          sessions_count: number | null
+          sessions_skipped: number | null
+          snapshot_date: string
+          study_minutes: number | null
+          subjects_studied: Json | null
+          user_id: string
+        }
+        Insert: {
+          ai_notes?: string | null
+          avg_session_length?: number | null
+          burnout_risk?: number | null
+          consistency_score?: number | null
+          created_at?: string
+          emotional_signals?: Json | null
+          id?: string
+          motivation_score?: number | null
+          sessions_count?: number | null
+          sessions_skipped?: number | null
+          snapshot_date?: string
+          study_minutes?: number | null
+          subjects_studied?: Json | null
+          user_id: string
+        }
+        Update: {
+          ai_notes?: string | null
+          avg_session_length?: number | null
+          burnout_risk?: number | null
+          consistency_score?: number | null
+          created_at?: string
+          emotional_signals?: Json | null
+          id?: string
+          motivation_score?: number | null
+          sessions_count?: number | null
+          sessions_skipped?: number | null
+          snapshot_date?: string
+          study_minutes?: number | null
+          subjects_studied?: Json | null
           user_id?: string
         }
         Relationships: []
