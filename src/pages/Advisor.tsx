@@ -1,48 +1,156 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useSubjects } from "@/hooks/useSubjects";
 import { useStudySessions } from "@/hooks/useStudySessions";
+import { useUserXP } from "@/hooks/useGamification";
 import { useAwardBadge, BADGE_DEFINITIONS } from "@/hooks/useGamification";
+import { useAIConversations, useAIMemory } from "@/hooks/useAdvisor";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, Sparkles, Loader2, AlertTriangle, TrendingUp } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Brain, Sparkles, Loader2, Send, ChevronDown, Activity,
+  Flame, Target, TrendingUp, AlertTriangle, Zap, Shield,
+  Calendar, Clock, BookOpen, Users, BarChart2, MessageSquare
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+const MODES = [
+  { id: "chat", icon: <MessageSquare className="w-4 h-4" />, label: "مکالمه هوشمند", emoji: "💬", desc: "صحبت با مشاور" },
+  { id: "daily", icon: <Calendar className="w-4 h-4" />, label: "برنامه روزانه", emoji: "📅", desc: "برنامه‌ریزی امروز" },
+  { id: "insight", icon: <BarChart2 className="w-4 h-4" />, label: "تحلیل عملکرد", emoji: "📊", desc: "آنالیز رفتاری" },
+  { id: "strategy", icon: <Target className="w-4 h-4" />, label: "استراتژی کنکور", emoji: "🎯", desc: "نقشه راه بلندمدت" },
+  { id: "weekly", icon: <TrendingUp className="w-4 h-4" />, label: "گزارش هفتگی", emoji: "📈", desc: "روندهای هفته" },
+  { id: "emergency", icon: <AlertTriangle className="w-4 h-4" />, label: "حالت اضطراری", emoji: "🚨", desc: "آزمون نزدیک است!" },
+];
+
+const DEFAULT_MESSAGES: Record<string, string> = {
+  chat: "سلام! چه سوالی داری؟",
+  daily: "یک برنامه مطالعاتی هوشمند برای امروز بساز که با وضعیت فعلی‌ام تناسب داشته باشد.",
+  insight: "عملکرد مطالعاتی اخیر من را تحلیل کن و نقاط ضعف و قوت اصلی را بگو.",
+  strategy: "استراتژی کلی آمادگی کنکور من را طراحی کن - از الان تا روز آزمون.",
+  weekly: "گزارش هفتگی کاملی از عملکردم بده و هفته آینده را هم برنامه‌ریزی کن.",
+  emergency: "آزمون نزدیک است! یک برنامه اضطراری و فشرده برایم طراحی کن.",
+};
+
+type Msg = { id: string; role: "user" | "assistant"; content: string; mode?: string };
+
+function BurnoutMeter({ risk }: { risk: number }) {
+  const pct = Math.round(risk * 100);
+  const color = risk > 0.65 ? "text-destructive" : risk > 0.4 ? "text-yellow-500" : "text-emerald-500";
+  const label = risk > 0.65 ? "خطر فرسودگی" : risk > 0.4 ? "هشدار" : "سالم";
+  return (
+    <div className="flex items-center gap-2">
+      <Activity className={`w-3.5 h-3.5 ${color}`} />
+      <div className="flex-1">
+        <div className="flex justify-between mb-0.5">
+          <span className="text-[10px] text-muted-foreground">ریسک فرسودگی</span>
+          <span className={`text-[10px] font-bold ${color}`}>{label} {pct}٪</span>
+        </div>
+        <Progress value={pct} className="h-1" />
+      </div>
+    </div>
+  );
+}
+
+function MemoryBadge({ category, value }: { category: string; value: string }) {
+  const icons: Record<string, string> = {
+    behavior: "🧠", burnout: "⚡", performance: "📊", personality: "🎭", emotional: "💭", goals: "🎯",
+  };
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-muted/50 text-[10px]">
+      <span>{icons[category] || "📌"}</span>
+      <span className="text-muted-foreground truncate max-w-[80px]">{value}</span>
+    </div>
+  );
+}
+
+function ChatBubble({ msg, isStreaming }: { msg: Msg; isStreaming?: boolean }) {
+  const isUser = msg.role === "user";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`flex gap-2.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}
+    >
+      {!isUser && (
+        <div className="w-7 h-7 rounded-xl gradient-primary flex items-center justify-center shrink-0 mt-1 shadow-sm shadow-primary/20">
+          <Brain className="w-3.5 h-3.5 text-primary-foreground" />
+        </div>
+      )}
+      <div
+        className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+          isUser
+            ? "gradient-primary text-primary-foreground rounded-tr-sm"
+            : "glass border border-border/50 text-foreground rounded-tl-sm"
+        }`}
+        style={{ direction: "rtl" }}
+      >
+        <div className="whitespace-pre-wrap">{msg.content}</div>
+        {isStreaming && (
+          <span className="inline-block w-1.5 h-3.5 bg-current opacity-70 animate-pulse rounded-sm mr-0.5 align-middle" />
+        )}
+      </div>
+    </motion.div>
+  );
+}
 
 export default function Advisor() {
   const { user } = useAuth();
   const { data: profile } = useProfile();
   const { data: subjects = [] } = useSubjects();
   const { data: sessions = [] } = useStudySessions(30);
+  const { data: xp } = useUserXP();
   const awardBadge = useAwardBadge();
+  const { data: memory = [] } = useAIMemory();
   const { toast } = useToast();
 
+  const [mode, setMode] = useState("chat");
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [response, setResponse] = useState("");
-  const [mode, setMode] = useState<"daily" | "emergency" | "insight">("daily");
+  const [showModes, setShowModes] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const getAdvice = async () => {
-    if (!user) return;
-    setLoading(true);
-    setResponse("");
+  // Computed behavioral metrics from memory
+  const burnoutRisk = parseFloat(memory.find((m: any) => m.key === "burnout_risk_current")?.value || "0.2");
+  const motivationScore = parseFloat(memory.find((m: any) => m.key === "motivation_score")?.value || "0.5");
+  const consistencyScore = parseFloat(memory.find((m: any) => m.key === "consistency_score")?.value || "0.5");
+  const behaviorType = memory.find((m: any) => m.key === "study_behavior_type")?.value || "balanced";
 
-    const subjectInfo = subjects.map((s: any) => `${s.name} (سطح: ${s.strength_level}/100, اهمیت: ${s.importance_weight}/10)`).join("\n");
-    const recentSessions = sessions.slice(0, 20).map((s: any) => `${s.subjects?.name || "نامشخص"}: ${s.duration_minutes} دقیقه`).join("\n");
+  const daysLeft = profile?.exam_date
+    ? Math.max(0, Math.ceil((new Date(profile.exam_date).getTime() - Date.now()) / 86400000))
+    : null;
 
-    const examDate = profile?.exam_date;
-    const daysLeft = examDate ? Math.max(0, Math.ceil((new Date(examDate).getTime() - Date.now()) / 86400000)) : "نامشخص";
+  const selectedMode = MODES.find(m => m.id === mode)!;
 
-    let prompt = "";
-    if (mode === "daily") {
-      prompt = `تو یک مشاور تحصیلی حرفه‌ای هستی. برای دانش‌آموز رشته ${profile?.field_of_study || "نامشخص"} با ${profile?.daily_hours || 4} ساعت مطالعه روزانه و ${daysLeft} روز تا آزمون، یک برنامه مطالعاتی روزانه بهینه بساز.\n\nدروس:\n${subjectInfo}\n\nجلسات اخیر:\n${recentSessions}\n\nلطفاً برنامه را ساعت به ساعت و به فارسی بنویس. دروس ضعیف‌تر اولویت بیشتری داشته باشند.`;
-    } else if (mode === "emergency") {
-      prompt = `آزمون فرداست! دانش‌آموز رشته ${profile?.field_of_study || "نامشخص"} با دروس زیر نیاز به برنامه فوری دارد:\n\n${subjectInfo}\n\nیک برنامه فشرده و مؤثر برای امشب و فردا صبح بنویس. فقط مهم‌ترین نکات و دروس ضعیف را اولویت بده. به فارسی بنویس.`;
-    } else {
-      prompt = `تحلیل عملکرد هفتگی برای دانش‌آموز رشته ${profile?.field_of_study || "نامشخص"}:\n\nجلسات مطالعه:\n${recentSessions}\n\nدروس:\n${subjectInfo}\n\nلطفاً یک تحلیل کوتاه و مفید به فارسی بنویس: چه چیزی خوب بود، چه چیزی باید بهتر شود، و توصیه‌های عملی.`;
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
+  }, [messages]);
+
+  const sendMessage = async (messageText?: string) => {
+    const text = messageText || input.trim();
+    if (!text || !user || loading) return;
+
+    setInput("");
+    setLoading(true);
+    setShowModes(false);
+
+    const userMsg: Msg = { id: Date.now().toString(), role: "user", content: text, mode };
+    setMessages(prev => [...prev, userMsg]);
+
+    // Placeholder streaming message
+    const aiMsgId = (Date.now() + 1).toString();
+    setMessages(prev => [...prev, { id: aiMsgId, role: "assistant", content: "", mode }]);
 
     try {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/study-advisor`, {
@@ -51,39 +159,40 @@ export default function Advisor() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ prompt, mode }),
+        body: JSON.stringify({ message: text, mode }),
       });
 
       if (res.status === 429) {
         toast({ title: "تعداد درخواست‌ها زیاد است. لطفاً کمی صبر کنید.", variant: "destructive" });
+        setMessages(prev => prev.filter(m => m.id !== aiMsgId));
         setLoading(false);
         return;
       }
       if (res.status === 402) {
-        toast({ title: "اعتبار AI تمام شده. لطفاً شارژ کنید.", variant: "destructive" });
+        toast({ title: "اعتبار AI تمام شده.", variant: "destructive" });
+        setMessages(prev => prev.filter(m => m.id !== aiMsgId));
         setLoading(false);
         return;
       }
-
       if (!res.ok || !res.body) throw new Error("Failed");
 
       // Award badge on first use
-      await awardBadge.mutateAsync(BADGE_DEFINITIONS.find(b => b.badge_type === "ai_advisor")!);
+      await awardBadge.mutateAsync(BADGE_DEFINITIONS.find(b => b.badge_type === "ai_advisor")!).catch(() => {});
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let fullResponse = "";
+      let fullText = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
 
-        let newlineIndex: number;
-        while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-          let line = buffer.slice(0, newlineIndex);
-          buffer = buffer.slice(newlineIndex + 1);
+        let idx: number;
+        while ((idx = buffer.indexOf("\n")) !== -1) {
+          let line = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 1);
           if (line.endsWith("\r")) line = line.slice(0, -1);
           if (!line.startsWith("data: ")) continue;
           const jsonStr = line.slice(6).trim();
@@ -92,92 +201,239 @@ export default function Advisor() {
             const parsed = JSON.parse(jsonStr);
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) {
-              fullResponse += content;
-              setResponse(fullResponse);
+              fullText += content;
+              setMessages(prev =>
+                prev.map(m => m.id === aiMsgId ? { ...m, content: fullText } : m)
+              );
             }
-          } catch {}
+          } catch { /* partial chunk */ }
         }
       }
     } catch (e) {
       console.error(e);
       toast({ title: "خطا در دریافت پاسخ", variant: "destructive" });
+      setMessages(prev => prev.filter(m => m.id !== aiMsgId));
     } finally {
       setLoading(false);
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const longTermMemory = memory.filter((m: any) => m.memory_type === "long_term").slice(0, 6);
+  const midTermMemory = memory.filter((m: any) => m.memory_type === "mid_term").slice(0, 4);
+
   return (
     <AppLayout>
-      <div className="px-4 pt-6 pb-4 max-w-lg mx-auto space-y-4">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl gradient-accent flex items-center justify-center shadow-lg">
-            <Brain className="w-6 h-6 text-accent-foreground" />
+      <div className="flex flex-col h-[calc(100vh-4rem)] max-w-lg mx-auto">
+        {/* ── Header ── */}
+        <div className="px-4 pt-4 pb-2 shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-md shadow-primary/25">
+                  <Brain className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald rounded-full border-2 border-background" />
+              </div>
+              <div>
+                <h1 className="text-base font-bold leading-tight">الیت کوچ</h1>
+                <p className="text-[10px] text-muted-foreground">مشاور شناختی هوشمند کنکور</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {daysLeft !== null && (
+                <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold ${
+                  daysLeft < 30 ? "bg-destructive/15 text-destructive" : "bg-primary/10 text-primary"
+                }`}>
+                  <Clock className="w-3 h-3" />
+                  {daysLeft} روز
+                </div>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-xl h-8 px-2 text-xs gap-1"
+                onClick={() => setShowMemory(!showMemory)}
+              >
+                <Shield className="w-3.5 h-3.5" />
+                حافظه
+              </Button>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold">مشاور هوشمند</h1>
-            <p className="text-xs text-muted-foreground">powered by Gemini AI 🤖</p>
+
+          {/* Behavioral metrics strip */}
+          <Card className="glass rounded-xl p-2.5 mb-2">
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              <div className="text-center">
+                <div className="text-[10px] text-muted-foreground">انگیزه</div>
+                <div className="text-xs font-bold text-accent">{Math.round(motivationScore * 100)}٪</div>
+              </div>
+              <div className="text-center border-x border-border/40">
+                <div className="text-[10px] text-muted-foreground">انسجام</div>
+                <div className="text-xs font-bold text-primary">{Math.round(consistencyScore * 100)}٪</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[10px] text-muted-foreground">استریک</div>
+                <div className="text-xs font-bold" style={{ color: "hsl(25 95% 53%)" }}>🔥{xp?.streak_days || 0}</div>
+              </div>
+            </div>
+            <BurnoutMeter risk={burnoutRisk} />
+          </Card>
+
+          {/* Memory panel */}
+          <AnimatePresence>
+            {showMemory && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <Card className="glass rounded-xl p-3 mb-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-wide">🧠 حافظه بلندمدت</p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {longTermMemory.length > 0 ? longTermMemory.map((m: any) => (
+                      <MemoryBadge key={m.id} category={m.category} value={m.value} />
+                    )) : <span className="text-[10px] text-muted-foreground">داده‌ای ندارم هنوز</span>}
+                  </div>
+                  <p className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-wide">📊 حافظه میان‌مدت</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {midTermMemory.length > 0 ? midTermMemory.map((m: any) => (
+                      <MemoryBadge key={m.id} category={m.category} value={m.value} />
+                    )) : <span className="text-[10px] text-muted-foreground">داده‌ای ندارم هنوز</span>}
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Mode selector */}
+          <div className="relative">
+            <button
+              onClick={() => setShowModes(!showModes)}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl glass border border-border/50 text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <span>{selectedMode.emoji}</span>
+                <span className="font-medium">{selectedMode.label}</span>
+                <span className="text-[10px] text-muted-foreground">{selectedMode.desc}</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showModes ? "rotate-180" : ""}`} />
+            </button>
+            <AnimatePresence>
+              {showModes && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  className="absolute top-full left-0 right-0 z-20 mt-1 rounded-xl glass border border-border shadow-xl overflow-hidden"
+                >
+                  {MODES.map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => { setMode(m.id); setShowModes(false); }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-right hover:bg-muted/50 transition-colors ${mode === m.id ? "bg-primary/10" : ""}`}
+                    >
+                      <span className="text-lg">{m.emoji}</span>
+                      <div>
+                        <p className="text-sm font-medium">{m.label}</p>
+                        <p className="text-[10px] text-muted-foreground">{m.desc}</p>
+                      </div>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
-        {/* Mode cards */}
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { id: "daily", icon: "📅", label: "برنامه روزانه", desc: "بهینه‌سازی مطالعه" },
-            { id: "emergency", icon: "⚡", label: "فوری!", desc: "آزمون فرداست" },
-            { id: "insight", icon: "📊", label: "تحلیل", desc: "عملکرد هفتگی" },
-          ].map(m => (
-            <button
-              key={m.id}
-              onClick={() => setMode(m.id as any)}
-              className={`p-3 rounded-2xl text-center transition-all border ${mode === m.id ? "border-primary bg-primary/10" : "border-border glass"}`}
+        {/* ── Chat area ── */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-2 space-y-3">
+          {messages.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col items-center justify-center h-full gap-4 text-center"
             >
-              <div className="text-2xl mb-1">{m.icon}</div>
-              <p className="text-[11px] font-semibold">{m.label}</p>
-              <p className="text-[10px] text-muted-foreground">{m.desc}</p>
-            </button>
+              <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/30">
+                <Brain className="w-8 h-8 text-primary-foreground" />
+              </div>
+              <div>
+                <h2 className="font-bold text-base mb-1">الیت کوچ آماده‌ست</h2>
+                <p className="text-xs text-muted-foreground max-w-[240px]">
+                  {burnoutRisk > 0.6
+                    ? "نگران نباش، با هم کنار میایم 💙 امروز کمی سبک‌تر مطالعه کنیم."
+                    : "مشاور شناختی پیشرفته‌ات. چه سوالی داری؟"}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
+                {MODES.slice(0, 4).map(m => (
+                  <button
+                    key={m.id}
+                    onClick={() => { setMode(m.id); sendMessage(DEFAULT_MESSAGES[m.id]); }}
+                    className="glass rounded-xl p-2.5 text-center border border-border/50 hover:border-primary/40 transition-colors"
+                  >
+                    <div className="text-xl mb-0.5">{m.emoji}</div>
+                    <p className="text-[10px] font-medium">{m.label}</p>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {messages.map((msg, i) => (
+            <ChatBubble
+              key={msg.id}
+              msg={msg}
+              isStreaming={loading && i === messages.length - 1 && msg.role === "assistant"}
+            />
           ))}
         </div>
 
-        {/* Generate button */}
-        <Button onClick={getAdvice} disabled={loading} className="w-full h-13 rounded-2xl gradient-primary text-primary-foreground shadow-lg shadow-primary/20">
-          {loading ? <Loader2 className="w-5 h-5 animate-spin ml-2" /> : <Sparkles className="w-5 h-5 ml-2" />}
-          {loading ? "در حال تحلیل با AI..." : mode === "daily" ? "🗓 ساخت برنامه روزانه" : mode === "emergency" ? "🚨 برنامه اضطراری!" : "📊 تحلیل عملکرد"}
-        </Button>
-
-        {/* Response streaming */}
-        {response && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="glass rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-3 pb-3 border-b border-border/50">
-                <Brain className="w-4 h-4 text-accent" />
-                <span className="text-xs font-semibold text-accent">پاسخ مشاور AI</span>
-              </div>
-              <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-                {response}
-                {loading && <span className="inline-block w-1.5 h-4 bg-accent animate-pulse ml-1 rounded-sm" />}
-              </div>
-            </Card>
-          </motion.div>
-        )}
-
-        {!response && !loading && (
-          <Card className="glass rounded-2xl p-8 text-center">
-            <div className="text-5xl mb-3">🤖</div>
-            <p className="font-semibold mb-1">
-              {mode === "daily" ? "برنامه روزانه هوشمند" : mode === "emergency" ? "حالت اضطراری!" : "تحلیل عملکرد"}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {subjects.length === 0
-                ? "ابتدا دروس خود را در بخش مدیریت دروس اضافه کنید"
-                : mode === "emergency"
-                  ? "AI یک برنامه فشرده برای آزمون فردا می‌سازد"
-                  : "AI با تحلیل دروس و جلسات شما برنامه شخصی می‌سازد"}
-            </p>
-          </Card>
-        )}
+        {/* ── Input area ── */}
+        <div className="px-4 pb-4 pt-2 shrink-0">
+          {burnoutRisk > 0.6 && messages.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mb-2 p-2.5 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center gap-2"
+            >
+              <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+              <p className="text-[11px] text-destructive">ریسک فرسودگی بالاست — امروز سبک‌تر برنامه‌ریزی کن</p>
+            </motion.div>
+          )}
+          <div className="flex gap-2 items-end">
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={`پیام به ${selectedMode.label}...`}
+              className="rounded-xl resize-none text-sm min-h-[44px] max-h-[120px] glass border-border/60"
+              rows={1}
+              dir="rtl"
+              disabled={loading}
+            />
+            <Button
+              onClick={() => sendMessage()}
+              disabled={loading || !input.trim()}
+              size="icon"
+              className="rounded-xl h-11 w-11 gradient-primary text-primary-foreground shadow-md shadow-primary/25 shrink-0"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground text-center mt-1.5">
+            Enter برای ارسال • Shift+Enter برای خط جدید
+          </p>
+        </div>
       </div>
     </AppLayout>
   );
 }
-
