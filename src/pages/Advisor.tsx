@@ -153,11 +153,20 @@ export default function Advisor() {
     setMessages(prev => [...prev, { id: aiMsgId, role: "assistant", content: "", mode }]);
 
     try {
+      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        toast({ title: "لطفاً دوباره وارد شوید.", variant: "destructive" });
+        setMessages(prev => prev.filter(m => m.id !== aiMsgId));
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/study-advisor`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ message: text, mode }),
       });
