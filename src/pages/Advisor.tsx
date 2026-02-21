@@ -21,21 +21,21 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 const MODES = [
-  { id: "chat", icon: <MessageSquare className="w-4 h-4" />, label: "مکالمه هوشمند", emoji: "💬", desc: "صحبت با مشاور" },
-  { id: "daily", icon: <Calendar className="w-4 h-4" />, label: "برنامه روزانه", emoji: "📅", desc: "برنامه‌ریزی امروز" },
-  { id: "insight", icon: <BarChart2 className="w-4 h-4" />, label: "تحلیل عملکرد", emoji: "📊", desc: "آنالیز رفتاری" },
-  { id: "strategy", icon: <Target className="w-4 h-4" />, label: "استراتژی کنکور", emoji: "🎯", desc: "نقشه راه بلندمدت" },
-  { id: "weekly", icon: <TrendingUp className="w-4 h-4" />, label: "گزارش هفتگی", emoji: "📈", desc: "روندهای هفته" },
-  { id: "emergency", icon: <AlertTriangle className="w-4 h-4" />, label: "حالت اضطراری", emoji: "🚨", desc: "آزمون نزدیک است!" },
+  { id: "chat", icon: <MessageSquare className="w-4 h-4" />, label: "چت آزاد", emoji: "💬", desc: "هر سوالی داری بپرس" },
+  { id: "daily", icon: <Calendar className="w-4 h-4" />, label: "برنامه امروز", emoji: "📅", desc: "بگم امروز چی بخونی" },
+  { id: "insight", icon: <BarChart2 className="w-4 h-4" />, label: "کارنامه من", emoji: "📊", desc: "ببین چقد پیشرفت کردی" },
+  { id: "strategy", icon: <Target className="w-4 h-4" />, label: "نقشه راه کنکور", emoji: "🎯", desc: "برنامه کلی تا کنکور" },
+  { id: "weekly", icon: <TrendingUp className="w-4 h-4" />, label: "خلاصه هفته", emoji: "📈", desc: "این هفته چطور بود؟" },
+  { id: "emergency", icon: <AlertTriangle className="w-4 h-4" />, label: "آزمون فرداست!", emoji: "🚨", desc: "برنامه فوری بده" },
 ];
 
 const DEFAULT_MESSAGES: Record<string, string> = {
-  chat: "سلام! چه سوالی داری؟",
-  daily: "یک برنامه مطالعاتی هوشمند برای امروز بساز که با وضعیت فعلی‌ام تناسب داشته باشد.",
-  insight: "عملکرد مطالعاتی اخیر من را تحلیل کن و نقاط ضعف و قوت اصلی را بگو.",
-  strategy: "استراتژی کلی آمادگی کنکور من را طراحی کن - از الان تا روز آزمون.",
-  weekly: "گزارش هفتگی کاملی از عملکردم بده و هفته آینده را هم برنامه‌ریزی کن.",
-  emergency: "آزمون نزدیک است! یک برنامه اضطراری و فشرده برایم طراحی کن.",
+  chat: "سلام! یه راهنمایی میخوام.",
+  daily: "امروز چی بخونم؟ یه برنامه خوب بریز برام.",
+  insight: "عملکردم چطوره؟ کجاها ضعیفم کجاها خوبم؟",
+  strategy: "از الان تا کنکور چیکار کنم؟ یه نقشه راه بده.",
+  weekly: "این هفته چطور بود؟ هفته بعد چیکار کنم؟",
+  emergency: "آزمونم نزدیکه! سریع بگو چیکار کنم.",
 };
 
 type Msg = { id: string; role: "user" | "assistant"; content: string; mode?: string };
@@ -43,13 +43,13 @@ type Msg = { id: string; role: "user" | "assistant"; content: string; mode?: str
 function BurnoutMeter({ risk }: { risk: number }) {
   const pct = Math.round(risk * 100);
   const color = risk > 0.65 ? "text-destructive" : risk > 0.4 ? "text-yellow-500" : "text-emerald-500";
-  const label = risk > 0.65 ? "خطر فرسودگی" : risk > 0.4 ? "هشدار" : "سالم";
+  const label = risk > 0.65 ? "خسته‌ای!" : risk > 0.4 ? "مراقب باش" : "عالی";
   return (
     <div className="flex items-center gap-2">
       <Activity className={`w-3.5 h-3.5 ${color}`} />
       <div className="flex-1">
         <div className="flex justify-between mb-0.5">
-          <span className="text-[10px] text-muted-foreground">ریسک فرسودگی</span>
+          <span className="text-[10px] text-muted-foreground">خستگی ذهنی</span>
           <span className={`text-[10px] font-bold ${color}`}>{label} {pct}٪</span>
         </div>
         <Progress value={pct} className="h-1" />
@@ -252,7 +252,7 @@ export default function Advisor() {
               </div>
               <div>
                 <h1 className="text-base font-bold leading-tight">الیت کوچ</h1>
-                <p className="text-[10px] text-muted-foreground">مشاور شناختی هوشمند کنکور</p>
+                <p className="text-[10px] text-muted-foreground">مشاور هوشمند درسی</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -280,15 +280,15 @@ export default function Advisor() {
           <Card className="glass rounded-xl p-2.5 mb-2">
             <div className="grid grid-cols-3 gap-2 mb-2">
               <div className="text-center">
-                <div className="text-[10px] text-muted-foreground">انگیزه</div>
+                <div className="text-[10px] text-muted-foreground">میزان انگیزه</div>
                 <div className="text-xs font-bold text-accent">{Math.round(motivationScore * 100)}٪</div>
               </div>
               <div className="text-center border-x border-border/40">
-                <div className="text-[10px] text-muted-foreground">انسجام</div>
+                <div className="text-[10px] text-muted-foreground">نظم هفتگی</div>
                 <div className="text-xs font-bold text-primary">{Math.round(consistencyScore * 100)}٪</div>
               </div>
               <div className="text-center">
-                <div className="text-[10px] text-muted-foreground">استریک</div>
+                <div className="text-[10px] text-muted-foreground">روزهای پشت‌سرهم</div>
                 <div className="text-xs font-bold" style={{ color: "hsl(25 95% 53%)" }}>🔥{xp?.streak_days || 0}</div>
               </div>
             </div>
@@ -305,13 +305,13 @@ export default function Advisor() {
                 className="overflow-hidden"
               >
                 <Card className="glass rounded-xl p-3 mb-2">
-                  <p className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-wide">🧠 حافظه بلندمدت</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-wide">🧠 چیزایی که ازت یاد گرفتم</p>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {longTermMemory.length > 0 ? longTermMemory.map((m: any) => (
                       <MemoryBadge key={m.id} category={m.category} value={m.value} />
                     )) : <span className="text-[10px] text-muted-foreground">داده‌ای ندارم هنوز</span>}
                   </div>
-                  <p className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-wide">📊 حافظه میان‌مدت</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-wide">📊 وضعیت این هفته‌ات</p>
                   <div className="flex flex-wrap gap-1.5">
                     {midTermMemory.length > 0 ? midTermMemory.map((m: any) => (
                       <MemoryBadge key={m.id} category={m.category} value={m.value} />
@@ -377,8 +377,8 @@ export default function Advisor() {
                 <h2 className="font-bold text-base mb-1">الیت کوچ آماده‌ست</h2>
                 <p className="text-xs text-muted-foreground max-w-[240px]">
                   {burnoutRisk > 0.6
-                    ? "نگران نباش، با هم کنار میایم 💙 امروز کمی سبک‌تر مطالعه کنیم."
-                    : "مشاور شناختی پیشرفته‌ات. چه سوالی داری؟"}
+                    ? "خسته‌ای؟ نگران نباش، با هم حلش می‌کنیم 💙"
+                    : "سلام! من مشاور درسیتم. هر سوالی داری بپرس 😊"}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
@@ -414,7 +414,7 @@ export default function Advisor() {
               className="mb-2 p-2.5 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center gap-2"
             >
               <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
-              <p className="text-[11px] text-destructive">ریسک فرسودگی بالاست — امروز سبک‌تر برنامه‌ریزی کن</p>
+              <p className="text-[11px] text-destructive">خسته به نظر میای — امروز کمتر فشار بیار به خودت 💙</p>
             </motion.div>
           )}
           <div className="flex gap-2 items-end">
