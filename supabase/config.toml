@@ -1,1 +1,4 @@
 project_id = "siydwqqxutjbhmtlgonc"
+
+[functions.study-advisor]
+verify_jwt = false
