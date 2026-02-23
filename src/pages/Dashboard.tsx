@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useProfile } from "@/hooks/useProfile";
 import { useStudySessions } from "@/hooks/useStudySessions";
@@ -17,13 +17,21 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, 
 const CHART_COLORS = ["hsl(263,70%,58%)", "hsl(160,60%,45%)", "hsl(215,55%,25%)", "hsl(30,80%,55%)", "hsl(340,65%,50%)"];
 
 export default function Dashboard() {
-  const { data: profile } = useProfile();
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const navigate = useNavigate();
   const { data: sessions = [] } = useStudySessions(7);
   const { data: subjects = [] } = useSubjects();
   const { data: tasks = [] } = useTasks();
   const { data: xpData } = useUserXP();
   const { theme, toggleTheme } = useTheme();
-  const navigate = useNavigate();
+
+  // Redirect to onboarding if not completed
+  useEffect(() => {
+    if (!profileLoading && profile && !profile.onboarding_completed) {
+      navigate("/onboarding", { replace: true });
+    }
+  }, [profile, profileLoading, navigate]);
+
 
   // Exam countdown
   const examDate = profile?.exam_date ? new Date(profile.exam_date) : null;
