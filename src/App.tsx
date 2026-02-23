@@ -15,6 +15,7 @@ import FocusMode from "./pages/FocusMode";
 import Advisor from "./pages/Advisor";
 import Profile from "./pages/Profile";
 import Groups from "./pages/Groups";
+import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
+      <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/subjects" element={<ProtectedRoute><Subjects /></ProtectedRoute>} />
       <Route path="/timer" element={<ProtectedRoute><TimerPage /></ProtectedRoute>} />

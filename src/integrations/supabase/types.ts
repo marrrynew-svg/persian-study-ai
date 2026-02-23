@@ -383,43 +383,139 @@ export type Database = {
       }
       profiles: {
         Row: {
+          age: number | null
           avatar_url: string | null
+          average_grades: number | null
+          avg_daily_study_hours: number | null
+          best_study_time: string | null
+          biggest_challenge: string | null
+          biggest_fear: string | null
+          city: string | null
+          color_theme: string | null
           created_at: string
+          current_gpa: number | null
+          current_semester: number | null
           daily_hours: number | null
           display_name: string | null
+          education_level: string | null
           exam_date: string | null
           field_of_study: string | null
+          fixed_commitments: Json | null
+          gender: string | null
+          goal_timeline: string | null
+          grade_level: string | null
           id: string
+          konkur_year: number | null
+          last_exam_rank: number | null
+          learning_style: string | null
+          main_goal: string | null
+          motivation_reason: string | null
           onboarding_completed: boolean | null
+          onboarding_step: number | null
+          plan_adherence: number | null
+          planning_experience: string | null
+          preferred_tone: string | null
+          reminder_intensity: string | null
+          reminder_type: string | null
+          semester_credits: number | null
+          study_environment: string | null
+          subject_priorities: Json | null
+          target_gpa: number | null
           target_rank: number | null
+          university_major: string | null
           updated_at: string
           user_id: string
+          weekly_schedule: Json | null
         }
         Insert: {
+          age?: number | null
           avatar_url?: string | null
+          average_grades?: number | null
+          avg_daily_study_hours?: number | null
+          best_study_time?: string | null
+          biggest_challenge?: string | null
+          biggest_fear?: string | null
+          city?: string | null
+          color_theme?: string | null
           created_at?: string
+          current_gpa?: number | null
+          current_semester?: number | null
           daily_hours?: number | null
           display_name?: string | null
+          education_level?: string | null
           exam_date?: string | null
           field_of_study?: string | null
+          fixed_commitments?: Json | null
+          gender?: string | null
+          goal_timeline?: string | null
+          grade_level?: string | null
           id?: string
+          konkur_year?: number | null
+          last_exam_rank?: number | null
+          learning_style?: string | null
+          main_goal?: string | null
+          motivation_reason?: string | null
           onboarding_completed?: boolean | null
+          onboarding_step?: number | null
+          plan_adherence?: number | null
+          planning_experience?: string | null
+          preferred_tone?: string | null
+          reminder_intensity?: string | null
+          reminder_type?: string | null
+          semester_credits?: number | null
+          study_environment?: string | null
+          subject_priorities?: Json | null
+          target_gpa?: number | null
           target_rank?: number | null
+          university_major?: string | null
           updated_at?: string
           user_id: string
+          weekly_schedule?: Json | null
         }
         Update: {
+          age?: number | null
           avatar_url?: string | null
+          average_grades?: number | null
+          avg_daily_study_hours?: number | null
+          best_study_time?: string | null
+          biggest_challenge?: string | null
+          biggest_fear?: string | null
+          city?: string | null
+          color_theme?: string | null
           created_at?: string
+          current_gpa?: number | null
+          current_semester?: number | null
           daily_hours?: number | null
           display_name?: string | null
+          education_level?: string | null
           exam_date?: string | null
           field_of_study?: string | null
+          fixed_commitments?: Json | null
+          gender?: string | null
+          goal_timeline?: string | null
+          grade_level?: string | null
           id?: string
+          konkur_year?: number | null
+          last_exam_rank?: number | null
+          learning_style?: string | null
+          main_goal?: string | null
+          motivation_reason?: string | null
           onboarding_completed?: boolean | null
+          onboarding_step?: number | null
+          plan_adherence?: number | null
+          planning_experience?: string | null
+          preferred_tone?: string | null
+          reminder_intensity?: string | null
+          reminder_type?: string | null
+          semester_credits?: number | null
+          study_environment?: string | null
+          subject_priorities?: Json | null
+          target_gpa?: number | null
           target_rank?: number | null
+          university_major?: string | null
           updated_at?: string
           user_id?: string
+          weekly_schedule?: Json | null
         }
         Relationships: []
       }
