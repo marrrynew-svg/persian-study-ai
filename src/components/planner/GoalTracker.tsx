@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Target, TrendingUp, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { getSessionSeconds } from "@/lib/studySession";
 
 interface Props {
   sessions: any[];
@@ -18,7 +19,7 @@ export function GoalTracker({ sessions, subjects, xpData }: Props) {
   const dailyGoalMin = 240;
   const todayMin = sessions
     .filter((s: any) => s.started_at?.startsWith(todayStr))
-    .reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+    .reduce((sum: number, s: any) => sum + Math.ceil(getSessionSeconds(s) / 60), 0);
   const dailyPct = Math.min(Math.round((todayMin / dailyGoalMin) * 100), 100);
 
   // Weekly goal: 24 hours
@@ -27,7 +28,7 @@ export function GoalTracker({ sessions, subjects, xpData }: Props) {
   weekStart.setDate(today.getDate() - today.getDay() - 1); // Saturday
   const weekMin = sessions
     .filter((s: any) => new Date(s.started_at) >= weekStart)
-    .reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+    .reduce((sum: number, s: any) => sum + Math.ceil(getSessionSeconds(s) / 60), 0);
   const weekPct = Math.min(Math.round((weekMin / weekGoalMin) * 100), 100);
 
   // Subject-level progress
@@ -35,7 +36,7 @@ export function GoalTracker({ sessions, subjects, xpData }: Props) {
     subjects.slice(0, 5).map((sub: any) => {
       const subMin = sessions
         .filter((s: any) => s.subject_id === sub.id)
-        .reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+        .reduce((sum: number, s: any) => sum + Math.ceil(getSessionSeconds(s) / 60), 0);
       const goal = (sub.importance_weight || 5) * 60; // weight * 60 min
       const pct = Math.min(Math.round((subMin / goal) * 100), 100);
       return { ...sub, minutes: subMin, goal, pct };

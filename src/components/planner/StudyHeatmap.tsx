@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getSessionSeconds } from "@/lib/studySession";
 
 interface StudyHeatmapProps {
   sessions: any[];
@@ -12,7 +13,7 @@ export function StudyHeatmap({ sessions, days = 90 }: StudyHeatmapProps) {
     const map: Record<string, number> = {};
     sessions.forEach((s: any) => {
       const date = s.started_at?.split("T")[0];
-      if (date) map[date] = (map[date] || 0) + (s.duration_minutes || 0);
+      if (date) map[date] = (map[date] || 0) + Math.ceil(getSessionSeconds(s) / 60);
     });
 
     const result = [];

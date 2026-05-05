@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SessionLogDialog } from "./SessionLogDialog";
 import { Clock, BookOpen, Play, Plus } from "lucide-react";
+import { formatStudyDuration, getSessionSeconds, sumSessionSeconds } from "@/lib/studySession";
 import { useNavigate } from "react-router-dom";
 
 interface Props {
@@ -22,7 +23,8 @@ export function DailyPlanner({ sessions, subjects }: Props) {
     [sessions, today]
   );
 
-  const totalMinutes = todaySessions.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+  const totalSeconds = sumSessionSeconds(todaySessions);
+  const totalMinutes = Math.ceil(totalSeconds / 60);
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);
@@ -81,12 +83,12 @@ export function DailyPlanner({ sessions, subjects }: Props) {
                       <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
                         <span>{formatTime(s.started_at)}</span>
                         <span>·</span>
-                        <span>{s.duration_minutes} دقیقه</span>
+                        <span>{formatStudyDuration(getSessionSeconds(s))}</span>
                         {s.session_type && (
                           <>
                             <span>·</span>
                             <span className="px-1.5 py-0.5 rounded-full bg-muted text-[9px]">
-                              {s.session_type === "pomodoro" ? "🍅" : s.session_type === "manual" ? "✍️" : "⏱"}
+                              {s.mode === "pomodoro" ? "🍅" : s.source === "manual" ? "✍️" : "⏱"}
                             </span>
                           </>
                         )}

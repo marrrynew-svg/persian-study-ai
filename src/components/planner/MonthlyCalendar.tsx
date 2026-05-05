@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getSessionSeconds } from "@/lib/studySession";
 
 const WEEKDAY_LABELS = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
 const MONTH_NAMES = [
@@ -32,7 +33,7 @@ export function MonthlyCalendar({ sessions }: Props) {
       const date = new Date(year, month, i + 1);
       const dateStr = date.toISOString().split("T")[0];
       const daySessions = sessions.filter((s: any) => s.started_at?.startsWith(dateStr));
-      const totalMin = daySessions.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+      const totalMin = Math.ceil(daySessions.reduce((sum: number, s: any) => sum + getSessionSeconds(s), 0) / 60);
       const isToday = dateStr === new Date().toISOString().split("T")[0];
       return { day: i + 1, date: dateStr, totalMin, sessions: daySessions.length, isToday };
     });

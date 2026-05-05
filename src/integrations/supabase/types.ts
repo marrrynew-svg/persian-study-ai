@@ -598,33 +598,51 @@ export type Database = {
       }
       study_sessions: {
         Row: {
+          client_session_id: string | null
           completed: boolean | null
+          created_at: string
           duration_minutes: number
+          duration_seconds: number
           ended_at: string | null
           id: string
+          mode: string
           session_type: string | null
+          source: string
           started_at: string
           subject_id: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
+          client_session_id?: string | null
           completed?: boolean | null
+          created_at?: string
           duration_minutes?: number
+          duration_seconds: number
           ended_at?: string | null
           id?: string
+          mode?: string
           session_type?: string | null
+          source?: string
           started_at?: string
           subject_id?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
+          client_session_id?: string | null
           completed?: boolean | null
+          created_at?: string
           duration_minutes?: number
+          duration_seconds?: number
           ended_at?: string | null
           id?: string
+          mode?: string
           session_type?: string | null
+          source?: string
           started_at?: string
           subject_id?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: [

@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Clock } from "lucide-react";
+import { getSessionSeconds } from "@/lib/studySession";
 
 const WEEKDAYS = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"];
 
@@ -27,7 +28,7 @@ export function WeeklyPlanner({ sessions, subjects }: Props) {
       const isToday = dateStr === today.toISOString().split("T")[0];
 
       const daySessions = sessions.filter((s: any) => s.started_at?.startsWith(dateStr));
-      const totalMin = daySessions.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+      const totalMin = Math.ceil(daySessions.reduce((sum: number, s: any) => sum + getSessionSeconds(s), 0) / 60);
 
       // Group by subject
       const subjectMap: Record<string, { name: string; icon: string; color: string; minutes: number }> = {};
@@ -41,7 +42,7 @@ export function WeeklyPlanner({ sessions, subjects }: Props) {
             minutes: 0,
           };
         }
-        subjectMap[id].minutes += s.duration_minutes || 0;
+        subjectMap[id].minutes += Math.ceil(getSessionSeconds(s) / 60);
       });
 
       return {

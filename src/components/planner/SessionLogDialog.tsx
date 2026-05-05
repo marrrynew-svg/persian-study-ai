@@ -7,6 +7,7 @@ import { useSaveSession } from "@/hooks/useStudySessions";
 import { useAddXP, useUpdateStreak } from "@/hooks/useGamification";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Clock, BookOpen, Zap } from "lucide-react";
+import { createClientSessionId } from "@/lib/studySession";
 
 interface Props {
   subjects: any[];
@@ -49,9 +50,13 @@ export function SessionLogDialog({ subjects, children }: Props) {
       await saveSession.mutateAsync({
         subject_id: subjectId || null,
         duration_minutes: duration,
+        duration_seconds: duration * 60,
+        mode: "manual",
         session_type: selectedTags[0] || "manual",
+        source: "manual",
         started_at: started.toISOString(),
         ended_at: now.toISOString(),
+        client_session_id: createClientSessionId(),
       });
 
       const xpEarned = Math.round(duration * 2);

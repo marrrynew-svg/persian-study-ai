@@ -2,6 +2,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
+type SubjectUpdate = {
+  id: string;
+  name?: string;
+  icon?: string | null;
+  color?: string | null;
+  strength_level?: number | null;
+  importance_weight?: number | null;
+};
+
 export function useSubjects() {
   const { user } = useAuth();
 
@@ -44,7 +53,7 @@ export function useUpdateSubject() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; [key: string]: any }) => {
+    mutationFn: async ({ id, ...updates }: SubjectUpdate) => {
       const { data, error } = await supabase
         .from("subjects")
         .update(updates)

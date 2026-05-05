@@ -13,13 +13,14 @@ import { Progress } from "@/components/ui/progress";
 import { Calendar, Clock, Flame, Target, TrendingUp, BookOpen, Moon, Sun, ChevronLeft, Zap, Star, Users } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
+import { formatStudyDuration, getSessionSeconds, sumSessionSeconds } from "@/lib/studySession";
 
 const CHART_COLORS = ["hsl(263,70%,58%)", "hsl(160,60%,45%)", "hsl(215,55%,25%)", "hsl(30,80%,55%)", "hsl(340,65%,50%)"];
 
 export default function Dashboard() {
   const { data: profile, isLoading: profileLoading } = useProfile();
   const navigate = useNavigate();
-  const { data: sessions = [] } = useStudySessions(7);
+  const { data: sessions = [] } = useStudySessions(31);
   const { data: subjects = [] } = useSubjects();
   const { data: tasks = [] } = useTasks();
   const { data: xpData } = useUserXP();
@@ -40,7 +41,9 @@ export default function Dashboard() {
   // Today's stats
   const today = new Date().toISOString().split("T")[0];
   const todaySessions = sessions.filter((s: any) => s.started_at?.startsWith(today));
-  const todayMinutes = todaySessions.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+  const todaySeconds = sumSessionSeconds(todaySessions);
+  const weekSeconds = sumSessionSeconds(sessions.filter((s: any) => new Date(s.started_at) >= new Date(Date.now() - 7 * 86400000)));
+  const monthSeconds = sumSessionSeconds(sessions);
   const completedTasks = tasks.filter((t: any) => t.completed).length;
   const totalTasks = tasks.length;
 
@@ -56,18 +59,18 @@ export default function Dashboard() {
     const dateStr = d.toISOString().split("T")[0];
     const dayNames = ["یک", "دو", "سه", "چهار", "پنج", "جمعه", "شنبه"];
     const shortNames = ["ی", "د", "س", "چ", "پ", "ج", "ش"];
-    const mins = sessions
+    const secs = sessions
       .filter((s: any) => s.started_at?.startsWith(dateStr))
-      .reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
-    return { day: shortNames[d.getDay()], hours: +(mins / 60).toFixed(1) };
+      .reduce((sum: number, s: any) => sum + getSessionSeconds(s), 0);
+    return { day: shortNames[d.getDay()], hours: +(secs / 3600).toFixed(2) };
   });
 
   // Subject distribution
   const subjectData = subjects.map((sub: any) => {
-    const mins = sessions
+    const secs = sessions
       .filter((s: any) => s.subject_id === sub.id)
-      .reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
-    return { name: sub.name, value: mins, color: sub.color };
+      .reduce((sum: number, s: any) => sum + getSessionSeconds(s), 0);
+    return { name: sub.name, value: secs, color: sub.color };
   }).filter((d: any) => d.value > 0);
 
   const urgency = daysLeft !== null ? (daysLeft < 30 ? "high" : daysLeft < 60 ? "medium" : "low") : "low";
@@ -143,18 +146,18 @@ export default function Dashboard() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="grid grid-cols-3 gap-3">
           <Card className="glass rounded-2xl p-3 text-center">
             <Clock className="w-5 h-5 mx-auto text-accent mb-1" />
-            <p className="text-lg font-bold tabular-nums">{Math.floor(todayMinutes / 60)}:{String(todayMinutes % 60).padStart(2, "0")}</p>
+            <p className="text-lg font-bold tabular-nums">{formatStudyDuration(todaySeconds)}</p>
             <p className="text-[10px] text-muted-foreground">مطالعه امروز</p>
           </Card>
           <Card className="glass rounded-2xl p-3 text-center">
             <Flame className="w-5 h-5 mx-auto text-orange-500 mb-1" />
-            <p className="text-lg font-bold">{sessions.length}</p>
-            <p className="text-[10px] text-muted-foreground">جلسه هفته</p>
+            <p className="text-lg font-bold tabular-nums">{formatStudyDuration(weekSeconds)}</p>
+            <p className="text-[10px] text-muted-foreground">این هفته · {sessions.length} جلسه</p>
           </Card>
           <Card className="glass rounded-2xl p-3 text-center">
             <TrendingUp className="w-5 h-5 mx-auto text-emerald mb-1" />
-            <p className="text-lg font-bold">{totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%</p>
-            <p className="text-[10px] text-muted-foreground">پیشرفت</p>
+            <p className="text-lg font-bold tabular-nums">{formatStudyDuration(monthSeconds)}</p>
+            <p className="text-[10px] text-muted-foreground">این ماه</p>
           </Card>
         </motion.div>
 
@@ -196,7 +199,7 @@ export default function Dashboard() {
                     <div key={i} className="flex items-center gap-2 text-xs">
                       <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color || CHART_COLORS[i % CHART_COLORS.length] }} />
                       <span className="flex-1 truncate">{d.name}</span>
-                      <span className="text-muted-foreground shrink-0">{Math.round(d.value / 60)} ساعت</span>
+                      <span className="text-muted-foreground shrink-0">{Math.round(d.value / 3600 * 10) / 10} ساعت</span>
                     </div>
                   ))}
                 </div>
