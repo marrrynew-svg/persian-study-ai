@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useSubjects } from "@/hooks/useSubjects";
@@ -10,8 +10,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Play, Pause, Square, RotateCcw, Maximize2, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { createClientSessionId, formatStudyDuration, secondsBetween } from "@/lib/studySession";
 
-type TimerMode = "pomodoro" | "custom";
+type TimerMode = "pomodoro" | "stopwatch";
+
+type PersistedTimer = {
+  mode: TimerMode;
+  subjectId: string;
+  workMin: number;
+  breakMin: number;
+  totalSeconds: number;
+  isRunning: boolean;
+  isBreak: boolean;
+  startedAt: string | null;
+  pausedAt: string | null;
+  pausedElapsedSeconds: number;
+  sessionsCompleted: number;
+};
+
+const TIMER_STORAGE_KEY = "konkur-active-study-timer";
 
 export default function TimerPage() {
   const { data: subjects = [] } = useSubjects();
