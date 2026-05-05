@@ -17,6 +17,7 @@ import Profile from "./pages/Profile";
 import Groups from "./pages/Groups";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
+import { useStudySessionQueueSync } from "@/hooks/useStudySessions";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+  useStudySessionQueueSync();
 
   if (loading) {
     return (
