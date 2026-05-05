@@ -34,10 +34,10 @@ export function PlannerDashboard({ sessions, subjects, xpData }: Props) {
     d.setDate(d.getDate() - (6 - i));
     const dateStr = d.toISOString().split("T")[0];
     const dayNames = ["ی", "د", "س", "چ", "پ", "ج", "ش"];
-    const mins = sessions
+    const daySeconds = sessions
       .filter((s: any) => s.started_at?.startsWith(dateStr))
       .reduce((sum: number, s: any) => sum + getSessionSeconds(s), 0);
-    const mins = Math.ceil(mins / 60);
+    const mins = Math.ceil(daySeconds / 60);
     return { day: dayNames[d.getDay()], hours: +(mins / 60).toFixed(1), minutes: mins };
   }), [sessions]);
 
