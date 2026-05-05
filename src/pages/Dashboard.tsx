@@ -146,18 +146,18 @@ export default function Dashboard() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="grid grid-cols-3 gap-3">
           <Card className="glass rounded-2xl p-3 text-center">
             <Clock className="w-5 h-5 mx-auto text-accent mb-1" />
-            <p className="text-lg font-bold tabular-nums">{Math.floor(todayMinutes / 60)}:{String(todayMinutes % 60).padStart(2, "0")}</p>
+            <p className="text-lg font-bold tabular-nums">{formatStudyDuration(todaySeconds)}</p>
             <p className="text-[10px] text-muted-foreground">مطالعه امروز</p>
           </Card>
           <Card className="glass rounded-2xl p-3 text-center">
             <Flame className="w-5 h-5 mx-auto text-orange-500 mb-1" />
-            <p className="text-lg font-bold">{sessions.length}</p>
-            <p className="text-[10px] text-muted-foreground">جلسه هفته</p>
+            <p className="text-lg font-bold tabular-nums">{formatStudyDuration(weekSeconds)}</p>
+            <p className="text-[10px] text-muted-foreground">این هفته · {sessions.length} جلسه</p>
           </Card>
           <Card className="glass rounded-2xl p-3 text-center">
             <TrendingUp className="w-5 h-5 mx-auto text-emerald mb-1" />
-            <p className="text-lg font-bold">{totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%</p>
-            <p className="text-[10px] text-muted-foreground">پیشرفت</p>
+            <p className="text-lg font-bold tabular-nums">{formatStudyDuration(monthSeconds)}</p>
+            <p className="text-[10px] text-muted-foreground">این ماه</p>
           </Card>
         </motion.div>
 
@@ -199,7 +199,7 @@ export default function Dashboard() {
                     <div key={i} className="flex items-center gap-2 text-xs">
                       <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color || CHART_COLORS[i % CHART_COLORS.length] }} />
                       <span className="flex-1 truncate">{d.name}</span>
-                      <span className="text-muted-foreground shrink-0">{Math.round(d.value / 60)} ساعت</span>
+                      <span className="text-muted-foreground shrink-0">{Math.round(d.value / 3600 * 10) / 10} ساعت</span>
                     </div>
                   ))}
                 </div>
