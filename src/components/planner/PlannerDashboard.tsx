@@ -9,6 +9,7 @@ import {
   LineChart, Line, CartesianGrid,
 } from "recharts";
 import { Clock, Flame, TrendingUp, Target, Zap } from "lucide-react";
+import { formatStudyDuration, getSessionSeconds, sumSessionSeconds } from "@/lib/studySession";
 
 const COLORS = ["hsl(263,70%,58%)", "hsl(160,60%,45%)", "hsl(215,55%,40%)", "hsl(30,80%,55%)", "hsl(340,65%,50%)", "hsl(190,70%,45%)"];
 
@@ -21,8 +22,10 @@ interface Props {
 export function PlannerDashboard({ sessions, subjects, xpData }: Props) {
   const today = new Date().toISOString().split("T")[0];
   const todaySessions = sessions.filter((s: any) => s.started_at?.startsWith(today));
-  const todayMinutes = todaySessions.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
-  const totalMinutes = sessions.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+  const todaySeconds = sumSessionSeconds(todaySessions);
+  const todayMinutes = Math.ceil(todaySeconds / 60);
+  const totalSeconds = sumSessionSeconds(sessions);
+  const totalMinutes = Math.ceil(totalSeconds / 60);
   const avgDaily = sessions.length > 0 ? Math.round(totalMinutes / 7) : 0;
 
   // Weekly bar chart
@@ -33,15 +36,16 @@ export function PlannerDashboard({ sessions, subjects, xpData }: Props) {
     const dayNames = ["ی", "د", "س", "چ", "پ", "ج", "ش"];
     const mins = sessions
       .filter((s: any) => s.started_at?.startsWith(dateStr))
-      .reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+      .reduce((sum: number, s: any) => sum + getSessionSeconds(s), 0);
+    const mins = Math.ceil(mins / 60);
     return { day: dayNames[d.getDay()], hours: +(mins / 60).toFixed(1), minutes: mins };
   }), [sessions]);
 
   // Subject pie chart
   const subjectData = useMemo(() => subjects.map((sub: any) => {
-    const mins = sessions
+    const mins = Math.ceil(sessions
       .filter((s: any) => s.subject_id === sub.id)
-      .reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+      .reduce((sum: number, s: any) => sum + getSessionSeconds(s), 0) / 60);
     return { name: sub.name, value: mins, color: sub.color, icon: sub.icon };
   }).filter((d: any) => d.value > 0), [sessions, subjects]);
 
@@ -54,7 +58,7 @@ export function PlannerDashboard({ sessions, subjects, xpData }: Props) {
     const mins = sessions.filter((s: any) => {
       const d = new Date(s.started_at);
       return d >= weekStart && d < weekEnd;
-    }).reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+    }).reduce((sum: number, s: any) => sum + getSessionSeconds(s), 0) / 60;
     return { week: `هفته ${i + 1}`, hours: +(mins / 60).toFixed(1) };
   }), [sessions]);
 
@@ -69,7 +73,7 @@ export function PlannerDashboard({ sessions, subjects, xpData }: Props) {
       <motion.div {...ani(0)} className="grid grid-cols-3 gap-3">
         <Card className="glass rounded-2xl p-3 text-center">
           <Clock className="w-5 h-5 mx-auto text-accent mb-1" />
-          <p className="text-lg font-bold tabular-nums">{Math.floor(todayMinutes / 60)}:{String(todayMinutes % 60).padStart(2, "0")}</p>
+          <p className="text-lg font-bold tabular-nums">{formatStudyDuration(todaySeconds)}</p>
           <p className="text-[10px] text-muted-foreground">مطالعه امروز</p>
         </Card>
         <Card className="glass rounded-2xl p-3 text-center">
