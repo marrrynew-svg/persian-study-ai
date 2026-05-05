@@ -101,7 +101,7 @@ export function useSaveSession() {
           if (readError) throw readError;
           return existing;
         }
-        await markQueuedStudySessionFailed({ ...payload, retry_count: 0, queued_at: new Date().toISOString() }, error);
+        await markQueuedStudySessionFailed({ ...payload, retry_count: 0, queued_at: new Date().toISOString() }, error).catch(() => {});
         return { ...payload, id: normalized.client_session_id, subjects: null, __queued: true };
       }
       await removeQueuedStudySession(normalized.client_session_id);
