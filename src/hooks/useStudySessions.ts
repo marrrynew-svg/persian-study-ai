@@ -56,8 +56,16 @@ export function useStudySessions(days = 7) {
         .eq("user_id", user.id)
         .gte("started_at", since.toISOString())
         .order("started_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      const queued = await getQueuedStudySessions(user.id).catch(() => []);
+      const queuedRows = queued
+        .filter((session) => new Date(session.started_at) >= since)
+        .map((session) => ({ ...session, id: session.client_session_id, subjects: null, __queued: true }));
+      if (error) {
+        if (queuedRows.length > 0) return queuedRows;
+        throw error;
+      }
+      const syncedIds = new Set((data || []).map((session: any) => session.client_session_id));
+      return [...queuedRows.filter((session) => !syncedIds.has(session.client_session_id)), ...(data || [])];
     },
     enabled: !!user,
   });
@@ -74,7 +82,7 @@ export function useSaveSession() {
       if (!normalized.started_at || !normalized.ended_at || normalized.duration_seconds < 0) {
         throw new Error("Invalid study session");
       }
-      await enqueueStudySession(user.id, normalized);
+      await enqueueStudySession(user.id, normalized).catch((error) => console.warn("local session queue failed", error));
       const payload = { ...normalized, user_id: user.id };
       const { data, error } = await supabase
         .from("study_sessions")
