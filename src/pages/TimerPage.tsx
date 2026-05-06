@@ -128,14 +128,20 @@ export default function TimerPage() {
   };
 
   const saveCurrentSession = async (reason: "stop" | "complete" | "interrupt" = "stop") => {
-    if (saving || isBreak || !startedAt) return false;
+    if (saving || isBreak) return false;
     const endedAt = new Date().toISOString();
-    const durationSeconds = Math.max(1, secondsBetween(startedAt, endedAt) + pausedElapsedSeconds);
+    const liveSeconds = startedAt ? secondsBetween(startedAt, endedAt) : 0;
+    const durationSeconds = liveSeconds + pausedElapsedSeconds;
+    if (durationSeconds <= 0) return false;
+    const effectiveStart = startedAt
+      || pausedAt
+      || new Date(Date.now() - durationSeconds * 1000).toISOString();
+    console.info("SESSION_SAVING", { durationSeconds, reason, subjectId });
     setSaving(true);
     try {
       await saveSession.mutateAsync({
         subject_id: subjectId || null,
-        started_at: startedAt,
+        started_at: effectiveStart,
         ended_at: endedAt,
         duration_seconds: durationSeconds,
         mode,
@@ -144,12 +150,13 @@ export default function TimerPage() {
         client_session_id: createClientSessionId(),
         completed: reason === "complete" || reason === "stop",
       });
+      console.info("SESSION_SAVED", { durationSeconds, reason });
       const xpEarned = await rewardSession(durationSeconds);
       setSessionsCompleted((prev) => prev + 1);
       toast({ title: `✅ ${formatStudyDuration(durationSeconds)} ذخیره شد · +${xpEarned} XP` });
       return true;
     } catch (error) {
-      console.error("timer session save failed", error);
+      console.error("SESSION_ERROR", error);
       toast({ title: "جلسه محلی ذخیره شد؛ با برگشت اینترنت همگام می‌شود", variant: "destructive" });
       return false;
     } finally {
