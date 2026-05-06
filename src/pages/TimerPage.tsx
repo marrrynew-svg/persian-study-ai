@@ -11,6 +11,8 @@ import { Play, Pause, Square, RotateCcw, Maximize2, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { createClientSessionId, formatStudyDuration, secondsBetween } from "@/lib/studySession";
+import { enqueueStudySession } from "@/lib/sessionQueue";
+import { useAuth } from "@/contexts/AuthContext";
 
 type TimerMode = "pomodoro" | "stopwatch";
 
@@ -34,6 +36,7 @@ const DEFAULT_WORK_SECONDS = 25 * 60;
 export default function TimerPage() {
   const { data: subjects = [] } = useSubjects();
   const saveSession = useSaveSession();
+  const { user } = useAuth();
   const addXP = useAddXP();
   const updateStreak = useUpdateStreak();
   const awardBadge = useAwardBadge();
@@ -128,14 +131,20 @@ export default function TimerPage() {
   };
 
   const saveCurrentSession = async (reason: "stop" | "complete" | "interrupt" = "stop") => {
-    if (saving || isBreak || !startedAt) return false;
+    if (saving || isBreak) return false;
     const endedAt = new Date().toISOString();
-    const durationSeconds = Math.max(1, secondsBetween(startedAt, endedAt) + pausedElapsedSeconds);
+    const liveSeconds = startedAt ? secondsBetween(startedAt, endedAt) : 0;
+    const durationSeconds = liveSeconds + pausedElapsedSeconds;
+    if (durationSeconds <= 0) return false;
+    const effectiveStart = startedAt
+      || pausedAt
+      || new Date(Date.now() - durationSeconds * 1000).toISOString();
+    console.info("SESSION_SAVING", { durationSeconds, reason, subjectId });
     setSaving(true);
     try {
       await saveSession.mutateAsync({
         subject_id: subjectId || null,
-        started_at: startedAt,
+        started_at: effectiveStart,
         ended_at: endedAt,
         duration_seconds: durationSeconds,
         mode,
@@ -144,12 +153,13 @@ export default function TimerPage() {
         client_session_id: createClientSessionId(),
         completed: reason === "complete" || reason === "stop",
       });
+      console.info("SESSION_SAVED", { durationSeconds, reason });
       const xpEarned = await rewardSession(durationSeconds);
       setSessionsCompleted((prev) => prev + 1);
       toast({ title: `✅ ${formatStudyDuration(durationSeconds)} ذخیره شد · +${xpEarned} XP` });
       return true;
     } catch (error) {
-      console.error("timer session save failed", error);
+      console.error("SESSION_ERROR", error);
       toast({ title: "جلسه محلی ذخیره شد؛ با برگشت اینترنت همگام می‌شود", variant: "destructive" });
       return false;
     } finally {
@@ -183,11 +193,29 @@ export default function TimerPage() {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (isRunning && startedAt && !isBreak) persistTimer({ isRunning: true });
+      if (isBreak) return;
+      const endedAt = new Date().toISOString();
+      const liveSeconds = isRunning && startedAt ? secondsBetween(startedAt, endedAt) : 0;
+      const durationSeconds = liveSeconds + pausedElapsedSeconds;
+      if (durationSeconds > 0 && user) {
+        const effectiveStart = startedAt || pausedAt || new Date(Date.now() - durationSeconds * 1000).toISOString();
+        enqueueStudySession(user.id, {
+          subject_id: subjectId || null,
+          started_at: effectiveStart,
+          ended_at: endedAt,
+          duration_seconds: durationSeconds,
+          mode,
+          session_type: mode,
+          source: "timer",
+          client_session_id: createClientSessionId(),
+          completed: false,
+        }).catch(() => {});
+      }
+      if (isRunning && startedAt) persistTimer({ isRunning: true });
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isBreak, isRunning, persistTimer, startedAt]);
+  }, [isBreak, isRunning, mode, pausedAt, pausedElapsedSeconds, persistTimer, startedAt, subjectId, user]);
 
   const startTimer = () => {
     const now = new Date().toISOString();
