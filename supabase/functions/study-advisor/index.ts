@@ -172,6 +172,24 @@ function buildFullContext(data: {
     .map((c: any) => `  [${c.role === "user" ? "دانش‌آموز" : "مشاور"}]: ${c.content.slice(0, 200)}`)
     .join("\n");
 
+  const structured = memory.find((m: any) => m.key === "structured_user_profile");
+  let structuredBlock = "";
+  if (structured?.value) {
+    try {
+      const sp = JSON.parse(structured.value);
+      structuredBlock = `\n📦 پروفایل ساختاریافته (آخرین به‌روزرسانی ${structured.updated_at}):
+- وضوح هدف: ${Math.round((sp.goalClarityScore || 0) * 100)}٪
+- سطح ریسک: ${sp.riskLevel}
+- احتمال تخمینی موفقیت: ${Math.round((sp.estimatedSuccessProbability || 0) * 100)}٪
+- ساعت روزانه پیشنهادی: ${sp.recommendedDailyHours}
+- پنجره اوج تمرکز: ${sp.focusWindow}
+- دروس ضعیف: ${(sp.weakSubjects || []).map((s: any) => s.name).join("، ") || "ندارد"}
+- دروس قوی: ${(sp.strongSubjects || []).map((s: any) => s.name).join("، ") || "ندارد"}
+- وظایف عقب‌افتاده: ${sp.overdueTasks} | نرخ تکمیل وظایف: ${Math.round((sp.taskCompletionRate || 0) * 100)}٪
+- مطالعه هفته جاری: ${Math.round((sp.weekStudySeconds || 0) / 60)} دقیقه در ${sp.weekStudyDays} روز`;
+    } catch { /* ignore */ }
+  }
+
   const urgencyLevel =
     daysLeft !== null
       ? daysLeft < 7 ? "🔴 بحرانی - کمتر از یک هفته"
@@ -208,6 +226,7 @@ ${recentSessionsText || "  هیچ جلسه‌ای ثبت نشده"}
 - دقایق مطالعه کل: ${xp?.total_study_minutes || 0}
 
 ${behaviorProfile}
+${structuredBlock}
 
 🧠 حافظه بلندمدت (تاریخچه شخصیتی):
 ${longTermMemory || "  داده‌ای ندارم هنوز"}
