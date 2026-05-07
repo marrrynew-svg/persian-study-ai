@@ -273,6 +273,12 @@ export default function Onboarding() {
         onboarding_completed: true,
         onboarding_step: TOTAL_STEPS,
       }).eq("user_id", user!.id);
+      // Compute the structured user profile immediately so the AI knows
+      // who this person is on the very first chat / dashboard load.
+      try {
+        const { forceAIContextRefresh } = await import("@/lib/aiContextDispatcher");
+        await forceAIContextRefresh();
+      } catch (e) { console.warn("initial ai context refresh failed", e); }
       toast({ title: "🎉 خوش اومدی!", description: "حالا بریم یه برنامه درست و حسابی بچینیم!" });
       navigate("/");
     } catch {

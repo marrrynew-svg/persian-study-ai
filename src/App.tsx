@@ -19,6 +19,8 @@ import Onboarding from "./pages/Onboarding";
 import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
 import { useStudySessionQueueSync } from "@/hooks/useStudySessions";
+import { useEffect } from "react";
+import { forceAIContextRefresh } from "@/lib/aiContextDispatcher";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +42,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   const { user, loading } = useAuth();
   useStudySessionQueueSync();
+
+  useEffect(() => {
+    if (!user) return;
+    forceAIContextRefresh();
+    const onVisible = () => { if (document.visibilityState === "visible") forceAIContextRefresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [user]);
 
   if (loading) {
     return (
