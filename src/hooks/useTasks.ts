@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { dispatchAIContextRefresh } from "@/lib/aiContextDispatcher";
 
 export function useTasks() {
   const { user } = useAuth();
@@ -50,7 +51,7 @@ export function useAddTask() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tasks"] }); dispatchAIContextRefresh("task_added"); },
   });
 }
 
@@ -71,7 +72,7 @@ export function useToggleTask() {
       return { previous };
     },
     onError: (_error, _vars, context) => context?.previous.forEach(([key, data]) => qc.setQueryData(key, data)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tasks"] }); dispatchAIContextRefresh("task_toggled"); },
   });
 }
 
@@ -85,6 +86,6 @@ export function useDeleteTask() {
       const { error } = await supabase.from("tasks").delete().eq("id", id).eq("user_id", user.id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tasks"] }); dispatchAIContextRefresh("task_deleted"); },
   });
 }
