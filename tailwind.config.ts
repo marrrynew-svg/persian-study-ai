@@ -15,6 +15,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ["Vazirmatn", "sans-serif"],
+        mono: ["JetBrains Mono", "Vazirmatn", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -71,6 +72,14 @@ export default {
         "deep-blue": {
           DEFAULT: "hsl(var(--deep-blue))",
           foreground: "hsl(var(--deep-blue-foreground))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--primary-foreground))",
         },
       },
       borderRadius: {
