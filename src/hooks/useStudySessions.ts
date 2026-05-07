@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { enqueueStudySession, getQueuedStudySessions, markQueuedStudySessionFailed, removeQueuedStudySession } from "@/lib/sessionQueue";
 import { normalizeStudySession, type StudySessionInput } from "@/lib/studySession";
+import { dispatchAIContextRefresh } from "@/lib/aiContextDispatcher";
 
 async function syncQueuedStudySessions(userId: string) {
   const queued = await getQueuedStudySessions(userId);
@@ -111,6 +112,7 @@ export function useSaveSession() {
       qc.invalidateQueries({ queryKey: ["study_sessions"] });
       qc.invalidateQueries({ queryKey: ["user_xp"] });
       qc.invalidateQueries({ queryKey: ["weekly_challenges"] });
+      dispatchAIContextRefresh("session_saved");
     },
   });
 }
