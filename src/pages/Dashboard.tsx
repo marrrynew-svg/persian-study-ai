@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Clock, Flame, Target, BookOpen, Moon, Sun, Zap, Star, Users, Activity, BarChart3, Hash } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { formatStudyDuration } from "@/lib/studySession";
 import {
   dailyTotals,
@@ -85,9 +86,12 @@ export default function Dashboard() {
             </h1>
             <p className="text-xs text-muted-foreground">{greeting}</p>
           </div>
-          <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-xl">
-            {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-          </Button>
+          <div className="flex items-center gap-1">
+            <ThemeSwitcher />
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-xl hover-lift">
+              {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+            </Button>
+          </div>
         </motion.div>
 
         {/* XP Level Bar */}
