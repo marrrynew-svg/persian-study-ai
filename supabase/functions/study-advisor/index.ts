@@ -634,14 +634,18 @@ serve(async (req) => {
       xpResult,
       memoryResult,
       conversationsResult,
+      editsResult,
+      plansResult,
     ] = await Promise.all([
       supabaseAdmin.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
       supabaseAdmin.from("subjects").select("*").eq("user_id", userId).order("importance_weight", { ascending: false }),
-      supabaseAdmin.from("study_sessions").select("*, subjects(name, icon, color)").eq("user_id", userId).order("started_at", { ascending: false }).limit(60),
+      supabaseAdmin.from("study_sessions").select("*, subjects(name, icon, color)").eq("user_id", userId).is("deleted_at", null).order("started_at", { ascending: false }).limit(80),
       supabaseAdmin.from("tasks").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(20),
       supabaseAdmin.from("user_xp").select("*").eq("user_id", userId).maybeSingle(),
       supabaseAdmin.from("ai_user_memory").select("*").eq("user_id", userId),
       supabaseAdmin.from("ai_conversations").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(20),
+      supabaseAdmin.from("session_edits").select("*").eq("user_id", userId).gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()).order("created_at", { ascending: false }).limit(40),
+      supabaseAdmin.from("plan_items").select("*, subjects(name, icon)").eq("user_id", userId).limit(40),
     ]);
 
     const profile = profileResult.data;
@@ -651,6 +655,8 @@ serve(async (req) => {
     const xp = xpResult.data;
     const memory = memoryResult.data || [];
     const recentConversations = (conversationsResult.data || []).reverse();
+    const recentEdits = editsResult.data || [];
+    const planItems = plansResult.data || [];
 
     // ── Behavioral Analysis ──
     const burnoutRisk = computeBurnoutRisk(sessions);
@@ -667,6 +673,7 @@ serve(async (req) => {
     const fullContext = buildFullContext({
       profile, subjects, sessions, tasks, xp, memory, recentConversations,
       behaviorProfile, daysLeft, burnoutRisk, motivationScore, consistencyScore, skipProb,
+      recentEdits, planItems,
     });
 
     const emotionalState = detectEmotionalState(message);
