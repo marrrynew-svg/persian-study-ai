@@ -141,8 +141,12 @@ function buildFullContext(data: {
   motivationScore: number;
   consistencyScore: number;
   skipProb: number;
+  recentEdits?: any[];
+  planItems?: any[];
 }): string {
   const { profile, subjects, sessions, tasks, xp, memory, recentConversations, behaviorProfile, daysLeft, burnoutRisk } = data;
+  const recentEdits = data.recentEdits || [];
+  const planItems = data.planItems || [];
 
   const subjectDetail = subjects.map((s: any) => {
     const subSessions = sessions.filter((ss: any) => ss.subject_id === s.id);
@@ -185,6 +189,52 @@ function buildFullContext(data: {
   const todayTasksText =
     `  ✅ انجام‌شده امروز (${todayDoneTasks.length}): ${todayDoneTasks.map((t: any) => t.title).join("، ") || "هیچ‌کدام"}\n` +
     `  ⏳ باقی‌مانده امروز (${todayPendingTasks.length}): ${todayPendingTasks.map((t: any) => t.title).join("، ") || "هیچ‌کدام"}`;
+
+  // ── Pending tasks (overdue + no due) ──
+  const overdueTasks = tasks.filter((t: any) => !t.completed && t.due_date && String(t.due_date) < todayStr);
+  const undatedPending = tasks.filter((t: any) => !t.completed && !t.due_date);
+  const pendingTasksText =
+    `  🔴 عقب‌افتاده (${overdueTasks.length}): ${overdueTasks.slice(0, 6).map((t: any) => `${t.title} [مهلت ${t.due_date}]`).join("، ") || "ندارد"}\n` +
+    `  📌 بدون تاریخ (${undatedPending.length}): ${undatedPending.slice(0, 6).map((t: any) => t.title).join("، ") || "ندارد"}`;
+
+  // ── Week summary per subject ──
+  const weekStart = new Date(Date.now() - 7 * 86400000);
+  const weekSessions = sessions.filter((s: any) => new Date(s.started_at) >= weekStart);
+  const weekBySubject = new Map<string, { name: string; min: number; sessions: number }>();
+  for (const s of weekSessions) {
+    const name = s.subjects?.name || "بدون درس";
+    const cur = weekBySubject.get(name) || { name, min: 0, sessions: 0 };
+    cur.min += s.duration_minutes || 0;
+    cur.sessions += 1;
+    weekBySubject.set(name, cur);
+  }
+  const weekSummary = Array.from(weekBySubject.values())
+    .sort((a, b) => b.min - a.min)
+    .map((x) => `  • ${x.name}: ${x.min} دقیقه در ${x.sessions} جلسه`).join("\n") || "  هیچ مطالعه‌ای در ۷ روز اخیر";
+
+  // ── Recent edits / deletions (24h) ──
+  const dayAgo = Date.now() - 86400000;
+  const recent24 = recentEdits.filter((e: any) => new Date(e.created_at).getTime() > dayAgo);
+  const editsText = recent24.length
+    ? recent24.slice(0, 10).map((e: any) => {
+        const t = new Date(e.created_at).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
+        const action = e.action === "edit" ? "✏️ ویرایش" : e.action === "delete" ? "🗑️ حذف" : e.action === "restore" ? "♻️ بازگردانی" : e.action;
+        const before = e.before || {};
+        const after = e.after || {};
+        const detail = e.action === "edit"
+          ? `از ${before.duration_minutes ?? "?"} دقیقه به ${after.duration_minutes ?? "?"} دقیقه` + (before.subject_id !== after.subject_id ? " + درس عوض شده" : "")
+          : e.action === "delete" ? `${before.duration_minutes ?? "?"} دقیقه (${before.session_type || ""})` : "";
+        return `  • [${t}] ${action} — ${detail}`;
+      }).join("\n")
+    : "  هیچ ویرایش یا حذفی در ۲۴ ساعت اخیر";
+
+  // ── Planned vs actual today ──
+  const todayPlan = planItems.filter((p: any) => p.subject_id);
+  const plannedMin = todayPlan.reduce((s: number, p: any) => s + (p.duration_minutes || 0), 0);
+  const adherence = plannedMin > 0 ? Math.min(100, Math.round((todayMinutes / plannedMin) * 100)) : null;
+  const planText = todayPlan.length
+    ? `  برنامه‌ریزی‌شده: ${plannedMin} دقیقه | انجام‌شده: ${todayMinutes} دقیقه${adherence !== null ? ` | تطابق: ${adherence}٪` : ""}`
+    : "  برنامه‌ای برای امروز ثبت نشده";
 
   const longTermMemory = memory.filter((m: any) => m.memory_type === "long_term")
     .map((m: any) => `  [${m.category}] ${m.key}: ${m.value}`)
@@ -240,6 +290,20 @@ ${todaySessionsText}
 
 وظایف امروز:
 ${todayTasksText}
+
+وظایف در انتظار:
+${pendingTasksText}
+
+برنامه‌ریزی‌شده در مقابل انجام‌شده:
+${planText}
+
+تغییرات اخیر در جلسات (۲۴ ساعت گذشته):
+${editsText}
+
+═══════════════════════════════════════
+📅 خلاصه ۷ روز گذشته (به تفکیک درس)
+═══════════════════════════════════════
+${weekSummary}
 
 ═══════════════════════════════════════
 🎓 اطلاعات دانش‌آموز:
