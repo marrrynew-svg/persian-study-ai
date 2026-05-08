@@ -57,11 +57,9 @@ export function SessionLogDialog({ subjects, children }: Props) {
         started_at: started.toISOString(),
         ended_at: now.toISOString(),
         client_session_id: createClientSessionId(),
-        // @ts-expect-error - extra fields persisted directly
         quality,
-        // @ts-expect-error
         notes,
-      } as any);
+      });
 
       const xpEarned = Math.round(duration * 2);
       await addXP.mutateAsync(xpEarned);
