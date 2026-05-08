@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useStudySessions } from "@/hooks/useStudySessions";
+import { useStudySessions, useDeletedSessions, useRestoreSession } from "@/hooks/useStudySessions";
 import { useSubjects } from "@/hooks/useSubjects";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -17,8 +17,9 @@ import {
   consistencyScore, computeStreak, dateKey,
 } from "@/lib/analytics";
 import { formatStudyDuration } from "@/lib/studySession";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, RotateCcw, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 type Range = "today" | "week" | "month" | "all";
 type Metric = "time" | "sessions";
@@ -31,6 +32,9 @@ export default function Analytics() {
   const navigate = useNavigate();
   const { data: sessions = [] } = useStudySessions(90);
   const { data: subjects = [] } = useSubjects();
+  const { data: deletedSessions = [] } = useDeletedSessions(30);
+  const restore = useRestoreSession();
+  const { toast } = useToast();
 
   const [range, setRange] = useState<Range>("week");
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
@@ -266,6 +270,50 @@ export default function Analytics() {
               );
             })}
           </div>
+        </Card>
+
+        {/* Trash / Restore */}
+        <Card className="glass rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold flex items-center gap-1.5">
+              <Trash2 className="w-3.5 h-3.5" /> سطل بازیافت
+            </h3>
+            <span className="text-[10px] text-muted-foreground">{deletedSessions.length} جلسه</span>
+          </div>
+          {deletedSessions.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-3">جلسه حذف‌شده‌ای وجود ندارد</p>
+          ) : (
+            <div className="space-y-2">
+              {deletedSessions.slice(0, 10).map((s: any) => (
+                <div key={s.id} className="flex items-center justify-between bg-muted/40 rounded-xl px-3 py-2 text-xs">
+                  <div className="min-w-0 flex items-center gap-2">
+                    <span>{s.subjects?.icon || "📖"}</span>
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{s.subjects?.name || "بدون درس"}</p>
+                      <p className="text-[10px] text-muted-foreground" dir="ltr">
+                        {new Date(s.started_at).toLocaleString("fa-IR", { dateStyle: "short", timeStyle: "short" })} · {formatStudyDuration(s.duration_seconds || (s.duration_minutes || 0) * 60)}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-emerald gap-1"
+                    onClick={async () => {
+                      try {
+                        await restore.mutateAsync(s.id);
+                        toast({ title: "♻️ بازگردانی شد" });
+                      } catch (e: any) {
+                        toast({ title: "خطا", description: e.message, variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <RotateCcw className="w-3 h-3" /> بازگرداندن
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </AppLayout>
