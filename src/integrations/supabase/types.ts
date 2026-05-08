@@ -557,6 +557,39 @@ export type Database = {
           },
         ]
       }
+      session_edits: {
+        Row: {
+          action: string
+          after: Json | null
+          before: Json | null
+          changed_fields: Json | null
+          created_at: string
+          id: string
+          session_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          after?: Json | null
+          before?: Json | null
+          changed_fields?: Json | null
+          created_at?: string
+          id?: string
+          session_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          after?: Json | null
+          before?: Json | null
+          changed_fields?: Json | null
+          created_at?: string
+          id?: string
+          session_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       study_groups: {
         Row: {
           created_at: string
@@ -601,11 +634,15 @@ export type Database = {
           client_session_id: string | null
           completed: boolean | null
           created_at: string
+          deleted_at: string | null
           duration_minutes: number
           duration_seconds: number
+          edited_at: string | null
           ended_at: string | null
           id: string
           mode: string
+          notes: string | null
+          quality: string | null
           session_type: string | null
           source: string
           started_at: string
@@ -617,11 +654,15 @@ export type Database = {
           client_session_id?: string | null
           completed?: boolean | null
           created_at?: string
+          deleted_at?: string | null
           duration_minutes?: number
           duration_seconds: number
+          edited_at?: string | null
           ended_at?: string | null
           id?: string
           mode?: string
+          notes?: string | null
+          quality?: string | null
           session_type?: string | null
           source?: string
           started_at?: string
@@ -633,11 +674,15 @@ export type Database = {
           client_session_id?: string | null
           completed?: boolean | null
           created_at?: string
+          deleted_at?: string | null
           duration_minutes?: number
           duration_seconds?: number
+          edited_at?: string | null
           ended_at?: string | null
           id?: string
           mode?: string
+          notes?: string | null
+          quality?: string | null
           session_type?: string | null
           source?: string
           started_at?: string
