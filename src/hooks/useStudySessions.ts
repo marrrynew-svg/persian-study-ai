@@ -55,6 +55,7 @@ export function useStudySessions(days = 7) {
         .from("study_sessions")
         .select("*, subjects(name, icon, color)")
         .eq("user_id", user.id)
+        .is("deleted_at", null)
         .gte("started_at", since.toISOString())
         .order("started_at", { ascending: false });
       const queued = await getQueuedStudySessions(user.id).catch(() => []);
@@ -70,6 +71,49 @@ export function useStudySessions(days = 7) {
     },
     enabled: !!user,
   });
+}
+
+export function useDeletedSessions(days = 30) {
+  const { user } = useAuth();
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  return useQuery({
+    queryKey: ["study_sessions_deleted", user?.id, days],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("study_sessions")
+        .select("*, subjects(name, icon, color)")
+        .eq("user_id", user.id)
+        .not("deleted_at", "is", null)
+        .gte("started_at", since.toISOString())
+        .order("deleted_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+}
+
+async function logSessionEdit(userId: string, payload: {
+  session_id: string | null;
+  action: "create" | "edit" | "delete" | "restore" | "hard_delete";
+  changed_fields?: string[];
+  before?: any;
+  after?: any;
+}) {
+  try {
+    await supabase.from("session_edits").insert({
+      user_id: userId,
+      session_id: payload.session_id,
+      action: payload.action,
+      changed_fields: payload.changed_fields || [],
+      before: payload.before || {},
+      after: payload.after || {},
+    });
+  } catch (e) {
+    console.warn("session_edits log failed", e);
+  }
 }
 
 export function useSaveSession() {
@@ -130,4 +174,88 @@ export function useStudySessionQueueSync() {
     window.addEventListener("online", run);
     return () => window.removeEventListener("online", run);
   }, [qc, user]);
+}
+
+export function useUpdateSession() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch, before }: { id: string; patch: Record<string, any>; before?: any }) => {
+      if (!user) throw new Error("Not authenticated");
+      const next: any = { ...patch, edited_at: new Date().toISOString() };
+      if (patch.started_at && patch.ended_at) {
+        const sec = Math.max(0, Math.round((new Date(patch.ended_at).getTime() - new Date(patch.started_at).getTime()) / 1000));
+        next.duration_seconds = sec;
+        next.duration_minutes = Math.ceil(sec / 60);
+      } else if (typeof patch.duration_minutes === "number") {
+        next.duration_seconds = patch.duration_minutes * 60;
+      }
+      const { data, error } = await supabase
+        .from("study_sessions")
+        .update(next)
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .select("*, subjects(name, icon, color)")
+        .single();
+      if (error) throw error;
+      await logSessionEdit(user.id, {
+        session_id: id,
+        action: "edit",
+        changed_fields: Object.keys(patch),
+        before: before || {},
+        after: next,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["study_sessions"] });
+      qc.invalidateQueries({ queryKey: ["user_xp"] });
+      dispatchAIContextRefresh("session_edited");
+    },
+  });
+}
+
+export function useDeleteSession() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, before }: { id: string; before?: any }) => {
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("study_sessions")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      await logSessionEdit(user.id, { session_id: id, action: "delete", before: before || {} });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["study_sessions"] });
+      qc.invalidateQueries({ queryKey: ["study_sessions_deleted"] });
+      qc.invalidateQueries({ queryKey: ["user_xp"] });
+      dispatchAIContextRefresh("session_deleted");
+    },
+  });
+}
+
+export function useRestoreSession() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("study_sessions")
+        .update({ deleted_at: null })
+        .eq("id", id)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      await logSessionEdit(user.id, { session_id: id, action: "restore" });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["study_sessions"] });
+      qc.invalidateQueries({ queryKey: ["study_sessions_deleted"] });
+      dispatchAIContextRefresh("session_restored");
+    },
+  });
 }

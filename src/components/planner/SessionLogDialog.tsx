@@ -57,6 +57,8 @@ export function SessionLogDialog({ subjects, children }: Props) {
         started_at: started.toISOString(),
         ended_at: now.toISOString(),
         client_session_id: createClientSessionId(),
+        quality,
+        notes,
       });
 
       const xpEarned = Math.round(duration * 2);

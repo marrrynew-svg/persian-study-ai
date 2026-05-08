@@ -11,6 +11,8 @@ export type StudySessionInput = {
   source?: "timer" | "manual" | string;
   client_session_id?: string;
   completed?: boolean;
+  quality?: string | null;
+  notes?: string | null;
 };
 
 export const secondsBetween = (startedAt: string, endedAt: string) => {
@@ -45,6 +47,8 @@ export const normalizeStudySession = (session: StudySessionInput) => {
     source: session.source || (mode === "manual" ? "manual" : "timer"),
     client_session_id: session.client_session_id || createClientSessionId(),
     completed: session.completed ?? true,
+    quality: session.quality ?? null,
+    notes: session.notes ?? null,
   };
 };
 

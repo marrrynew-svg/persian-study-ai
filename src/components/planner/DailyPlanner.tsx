@@ -6,6 +6,7 @@ import { SessionLogDialog } from "./SessionLogDialog";
 import { Clock, BookOpen, Play, Plus } from "lucide-react";
 import { formatStudyDuration, getSessionSeconds, sumSessionSeconds } from "@/lib/studySession";
 import { useNavigate } from "react-router-dom";
+import { SessionActions } from "@/components/sessions/SessionActions";
 
 interface Props {
   sessions: any[];
@@ -101,6 +102,7 @@ export function DailyPlanner({ sessions, subjects }: Props) {
                   >
                     <Clock className="w-4 h-4" style={{ color: getSessionColor(s) }} />
                   </div>
+                  <SessionActions session={s} />
                 </div>
               </Card>
             </motion.div>

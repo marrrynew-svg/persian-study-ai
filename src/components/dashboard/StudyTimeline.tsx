@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Clock } from "lucide-react";
 import { formatStudyDuration, getSessionSeconds } from "@/lib/studySession";
+import { SessionActions } from "@/components/sessions/SessionActions";
 
 interface Props {
   sessions: any[];
@@ -61,6 +62,7 @@ export function StudyTimeline({ sessions }: Props) {
                       <Clock className="w-3 h-3 text-muted-foreground" />
                       {formatStudyDuration(seconds)}
                     </div>
+                    <SessionActions session={s} />
                   </div>
                 </motion.div>
               );
