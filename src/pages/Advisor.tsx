@@ -38,6 +38,15 @@ const DEFAULT_MESSAGES: Record<string, string> = {
   emergency: "آزمونم نزدیکه! سریع بگو چیکار کنم.",
 };
 
+const SLASH_COMMANDS: { cmd: string; label: string; message: string }[] = [
+  { cmd: "/امروز", label: "امروز چی خوندم؟", message: "امروز دقیقاً چی خوندم؟ با ساعت و مدت بگو." },
+  { cmd: "/برنامه", label: "برنامه امروزم چیه؟", message: "برنامه امروزم چیه؟ چی باید الان شروع کنم؟" },
+  { cmd: "/ضعیف", label: "ضعیف‌ترین درسم", message: "ضعیف‌ترین درسم چیه و چطور تقویتش کنم؟" },
+  { cmd: "/پیشرفت", label: "پیشرفت این هفته", message: "پیشرفتم این هفته چطور بوده؟ با عدد بگو." },
+  { cmd: "/انگیزه", label: "بهم انگیزه بده", message: "یه چیز واقعی از داده‌هام بگو که انگیزه بگیرم." },
+  { cmd: "/مرور", label: "چی مرور کنم؟", message: "الان چی باید مرور کنم؟ اولویت بده." },
+];
+
 type Msg = { id: string; role: "user" | "assistant"; content: string; mode?: string };
 
 function BurnoutMeter({ risk }: { risk: number }) {
@@ -116,6 +125,7 @@ export default function Advisor() {
   const [loading, setLoading] = useState(false);
   const [showModes, setShowModes] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [slashOpen, setSlashOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -230,8 +240,16 @@ export default function Advisor() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      setSlashOpen(false);
       sendMessage();
     }
+    if (e.key === "Escape") setSlashOpen(false);
+  };
+
+  const onInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const v = e.target.value;
+    setInput(v);
+    setSlashOpen(v.trim().startsWith("/"));
   };
 
   const longTermMemory = memory.filter((m: any) => m.memory_type === "long_term").slice(0, 6);
@@ -418,17 +436,40 @@ export default function Advisor() {
             </motion.div>
           )}
           <div className="flex gap-2 items-end">
+            <div className="relative flex-1">
+            <AnimatePresence>
+              {slashOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 6 }}
+                  className="absolute bottom-full left-0 right-0 mb-1 z-30 rounded-xl glass border border-border shadow-xl overflow-hidden"
+                >
+                  {SLASH_COMMANDS.map(c => (
+                    <button
+                      key={c.cmd}
+                      onClick={() => { setInput(""); setSlashOpen(false); sendMessage(c.message); }}
+                      className="w-full flex items-center justify-between px-3 py-2 text-right hover:bg-muted/50 transition-colors"
+                    >
+                      <span className="text-[10px] text-muted-foreground font-mono">{c.cmd}</span>
+                      <span className="text-xs">{c.label}</span>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
             <Textarea
               ref={textareaRef}
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={onInputChange}
               onKeyDown={handleKeyDown}
-              placeholder={`پیام به ${selectedMode.label}...`}
-              className="rounded-xl resize-none text-sm min-h-[44px] max-h-[120px] glass border-border/60"
+              placeholder={`پیام... (/ برای دستورات سریع)`}
+              className="rounded-xl resize-none text-sm min-h-[44px] max-h-[120px] glass border-border/60 w-full"
               rows={1}
               dir="rtl"
               disabled={loading}
             />
+            </div>
             <Button
               onClick={() => sendMessage()}
               disabled={loading || !input.trim()}
