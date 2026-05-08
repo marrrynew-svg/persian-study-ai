@@ -159,6 +159,33 @@ function buildFullContext(data: {
     .map((s: any) => `  ${s.started_at?.split("T")[0]} | ${s.subjects?.name || "آزاد"} | ${s.duration_minutes}min`)
     .join("\n");
 
+  // ── TODAY block (live, authoritative) ──
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todaySessions = sessions.filter((s: any) => s.started_at?.startsWith(todayStr));
+  const todayMinutes = todaySessions.reduce((a: number, s: any) => a + (s.duration_minutes || 0), 0);
+  const todaySeconds = todaySessions.reduce((a: number, s: any) => a + (s.duration_seconds || 0), 0);
+  const todaySessionsText = todaySessions.length
+    ? todaySessions
+        .map((s: any) => {
+          const t = s.started_at ? new Date(s.started_at).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" }) : "";
+          const dur = s.duration_minutes >= 1
+            ? `${s.duration_minutes} دقیقه`
+            : `${s.duration_seconds || 0} ثانیه`;
+          return `  • [${t}] ${s.subjects?.name || "آزاد"} — ${dur} (${s.mode || s.session_type || "timer"})`;
+        })
+        .join("\n")
+    : "  ⚠️ امروز هنوز هیچ جلسه‌ای ثبت نشده است.";
+
+  const todayTasks = tasks.filter((t: any) => {
+    if (!t.due_date) return false;
+    return String(t.due_date).startsWith(todayStr);
+  });
+  const todayDoneTasks = todayTasks.filter((t: any) => t.completed);
+  const todayPendingTasks = todayTasks.filter((t: any) => !t.completed);
+  const todayTasksText =
+    `  ✅ انجام‌شده امروز (${todayDoneTasks.length}): ${todayDoneTasks.map((t: any) => t.title).join("، ") || "هیچ‌کدام"}\n` +
+    `  ⏳ باقی‌مانده امروز (${todayPendingTasks.length}): ${todayPendingTasks.map((t: any) => t.title).join("، ") || "هیچ‌کدام"}`;
+
   const longTermMemory = memory.filter((m: any) => m.memory_type === "long_term")
     .map((m: any) => `  [${m.category}] ${m.key}: ${m.value}`)
     .join("\n");
@@ -204,6 +231,16 @@ function buildFullContext(data: {
       : "";
 
   return `
+═══════════════════════════════════════
+📌 امروز — ${todayStr} (داده‌های زنده، معتبر و قطعی)
+═══════════════════════════════════════
+مجموع مطالعه امروز: ${todayMinutes} دقیقه (${todaySeconds} ثانیه) در ${todaySessions.length} جلسه
+جلسات امروز:
+${todaySessionsText}
+
+وظایف امروز:
+${todayTasksText}
+
 ═══════════════════════════════════════
 🎓 اطلاعات دانش‌آموز:
 - نام: ${profile?.display_name || "دانش‌آموز"}
