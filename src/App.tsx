@@ -17,6 +17,7 @@ import Profile from "./pages/Profile";
 import Groups from "./pages/Groups";
 import Onboarding from "./pages/Onboarding";
 import Analytics from "./pages/Analytics";
+import NotesPage from "./pages/Notes";
 import NotFound from "./pages/NotFound";
 import { useStudySessionQueueSync } from "@/hooks/useStudySessions";
 import { useEffect } from "react";
@@ -73,6 +74,7 @@ function AppRoutes() {
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/groups" element={<ProtectedRoute><Groups /></ProtectedRoute>} />
       <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+      <Route path="/notes" element={<ProtectedRoute><NotesPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
