@@ -702,6 +702,7 @@ serve(async (req) => {
       conversationsResult,
       editsResult,
       plansResult,
+      notesResult,
     ] = await Promise.all([
       supabaseAdmin.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
       supabaseAdmin.from("subjects").select("*").eq("user_id", userId).order("importance_weight", { ascending: false }),
@@ -724,7 +725,7 @@ serve(async (req) => {
     const recentConversations = (conversationsResult.data || []).reverse();
     const recentEdits = editsResult.data || [];
     const planItems = plansResult.data || [];
-    const notes = (arguments[0] as any) ? [] : [];
+    const notes = (notesResult as any)?.data || [];
 
     // ── Behavioral Analysis ──
     const burnoutRisk = computeBurnoutRisk(sessions);
