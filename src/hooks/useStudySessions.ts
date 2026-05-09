@@ -259,3 +259,41 @@ export function useRestoreSession() {
     },
   });
 }
+
+export function useDuplicateSession() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (session: any) => {
+      if (!user) throw new Error("Not authenticated");
+      const now = new Date();
+      const seconds = session.duration_seconds || (session.duration_minutes || 0) * 60;
+      const ended = new Date(now.getTime());
+      const started = new Date(now.getTime() - seconds * 1000);
+      const payload: any = {
+        user_id: user.id,
+        subject_id: session.subject_id || null,
+        started_at: started.toISOString(),
+        ended_at: ended.toISOString(),
+        duration_seconds: seconds,
+        duration_minutes: Math.ceil(seconds / 60),
+        mode: session.mode || "manual",
+        source: "manual",
+        session_type: session.session_type || "manual",
+        quality: session.quality || null,
+        notes: session.notes || null,
+        completed: true,
+        client_session_id: `dup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      };
+      const { data, error } = await supabase.from("study_sessions").insert(payload).select().single();
+      if (error) throw error;
+      await logSessionEdit(user.id, { session_id: data.id, action: "create", after: payload });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["study_sessions"] });
+      qc.invalidateQueries({ queryKey: ["user_xp"] });
+      dispatchAIContextRefresh("session_duplicated");
+    },
+  });
+}
