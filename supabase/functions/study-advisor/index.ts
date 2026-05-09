@@ -712,7 +712,8 @@ serve(async (req) => {
       supabaseAdmin.from("ai_conversations").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(20),
       supabaseAdmin.from("session_edits").select("*").eq("user_id", userId).gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()).order("created_at", { ascending: false }).limit(40),
       supabaseAdmin.from("plan_items").select("*, subjects(name, icon)").eq("user_id", userId).limit(40),
-    ]);
+      supabaseAdmin.from("notes").select("id,title,content,pinned,tags,updated_at").eq("user_id", userId).order("updated_at", { ascending: false }).limit(20),
+    ] as any);
 
     const profile = profileResult.data;
     const subjects = subjectsResult.data || [];
@@ -723,6 +724,7 @@ serve(async (req) => {
     const recentConversations = (conversationsResult.data || []).reverse();
     const recentEdits = editsResult.data || [];
     const planItems = plansResult.data || [];
+    const notes = (arguments[0] as any) ? [] : [];
 
     // ── Behavioral Analysis ──
     const burnoutRisk = computeBurnoutRisk(sessions);
@@ -739,7 +741,7 @@ serve(async (req) => {
     const fullContext = buildFullContext({
       profile, subjects, sessions, tasks, xp, memory, recentConversations,
       behaviorProfile, daysLeft, burnoutRisk, motivationScore, consistencyScore, skipProb,
-      recentEdits, planItems,
+      recentEdits, planItems, notes,
     });
 
     const emotionalState = detectEmotionalState(message);
