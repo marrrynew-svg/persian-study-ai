@@ -1,45 +1,106 @@
-## Goal
-Rebuild study sessions to be fully editable/deletable/restorable, and make the AI chatbot always aware of the live state (including edits, deletes, and pending tasks).
+# Product Rebuild Plan — Sessions, AI Memory, Notes, Tasks, Home
 
-## Scope
+This is a large multi-system rebuild. I'll ship it in one cohesive update, in the order below, so every layer (DB → hooks → UI → AI) stays in sync.
 
-### 1. Database (migration)
-- Add `deleted_at TIMESTAMPTZ NULL`, `notes TEXT`, `quality TEXT`, `edited_at TIMESTAMPTZ` to `study_sessions` for soft-delete + edit tracking.
-- Add `session_edits` table (session_id, user_id, changed_fields jsonb, before jsonb, after jsonb, action: edit|delete|restore|create, created_at) for audit/AI memory.
-- Update RLS so users can manage their own edits.
-- Existing session queries filter `deleted_at IS NULL` by default.
+## 1. Database Migrations
 
-### 2. Hooks: `useStudySessions`
-- Add `useUpdateSession`, `useDeleteSession` (soft delete), `useRestoreSession`, `useHardDeleteSession`.
-- Each mutation: writes to `session_edits`, invalidates queries, calls `dispatchAIContextRefresh` immediately.
-- Default list filters out soft-deleted; expose `useDeletedSessions` for the trash/restore UI.
+New tables + columns to support the full product:
 
-### 3. UI: Session edit/delete
-- New `SessionEditDialog` component (subject, started_at, duration in minutes, session_type, quality, notes).
-- Each session row in `DailyPlanner`, `StudyTimeline`, and Analytics list gets a popover menu: Edit / Delete / (Restore for deleted).
-- Add a "سطل بازیافت" section on Analytics page listing recently deleted with one-click restore.
+- **`notes`** table: `id, user_id, title, content (markdown), pinned bool, folder text, tags text[], subject_id, session_id (nullable link), created_at, updated_at`. RLS: users manage own.
+- **`tasks`** — add columns: `tags text[]`, `category text`, `recurrence text` (none|daily|weekly), `parent_task_id uuid` (subtasks), `position int`, `completed_at timestamptz`.
+- **`study_sessions`** — add `tags text[]`, `productivity_rating int (1–5)`, `focus_quality text` (already have `quality`, will reuse). Confirm `notes`, `deleted_at`, `edited_at` exist (they do).
+- Indexes for `notes(user_id, updated_at)`, `tasks(user_id, parent_task_id)`.
 
-### 4. AI context: live + edits-aware
-- Extend `study-advisor` edge function `📌 امروز` block to also include:
-  - Today's edits (last 24h from `session_edits`)
-  - Today's deletions
-  - Pending tasks (incomplete, due today/overdue)
-  - Week summary (per subject totals)
-  - Planned vs actual (plan_items vs sessions) for today
-- Include explicit rules: never count deleted sessions; quote edited durations as the new value.
+## 2. Session CRUD — Make Actions Visible & Powerful
 
-### 5. Event-driven sync
-- All mutations (create/edit/delete/restore + tasks) call `dispatchAIContextRefresh(reason)` which is already wired to the refresh function.
-- Update `refresh-ai-context` to include edit/delete counts in the structured profile.
+Replace the hidden popover-only menu with **inline visible action buttons** on every session card:
 
-## Technical notes
-- Soft delete via `deleted_at`; restore = set `deleted_at = NULL`.
-- `session_edits` is append-only audit log — gives AI memory of changes.
-- Quality/notes were collected in manual log dialog but never persisted; this fixes that too.
-- Realtime channel already invalidates on `*` events — covers edits/deletes for free.
-- Keep all UI in Persian, RTL, glassmorphism style per memory.
+- New component `SessionCard` with always-visible icon buttons: ✏️ Edit · 📋 Duplicate · 🗒️ Add Note · 🗑️ Delete, plus a "Details" tap target.
+- Used in `DailyPlanner`, `StudyTimeline`, and a new "Today's Sessions" home block.
+- Enhance `SessionEditDialog`: subject, date, start time, end time (auto-compute duration), duration override, mode, productivity rating (1–5 stars), tags, notes — all in one elegant modal.
+- New hook `useDuplicateSession` (creates a copy now-shifted).
+- New hook `useAddSessionNote` (creates a `notes` row linked via `session_id` and refreshes AI context).
+- New `SessionDetailsSheet` (slide-over): full info, edit timeline from `session_edits`, linked notes, tags, AI insight (local heuristic).
+- Trash/Restore: keep on Analytics page (already exists), add a quick-link from Home when trash > 0.
 
-## Out of scope
-- No redesign of dashboard/analytics layout (already shipped).
-- No changes to timer logic.
-- No rewrite of chatbot UI (already has slash commands).
+## 3. Notes System
+
+- Routes: `/notes` (list + editor split view) + quick-note widget on Home.
+- `NotesList`: search, folder filter, tag filter, pinned-first.
+- `NoteEditor`: markdown textarea with live preview (use existing `react-markdown` if present, else simple textarea + preview). Pin/unpin, folder, tags, link-to-subject/session.
+- Hooks: `useNotes`, `useUpsertNote`, `useDeleteNote`, `useTogglePin` — all dispatch AI context refresh.
+- Add nav entry in `BottomNav`.
+
+## 4. Task Manager Upgrade
+
+- Enhance `/tasks` page: filters (today / upcoming / overdue / completed), priority pill, drag-to-reorder (using `@dnd-kit/core` if installed, else simple up/down arrows), subtask expand, tags chips, due-date picker.
+- Quick-add input on Home with priority + due-date inline.
+- New hooks: `useReorderTasks`, `useAddSubtask`. Existing `useToggleTask` already dispatches AI refresh.
+
+## 5. Home Redesign
+
+Single composed `Dashboard.tsx` with these stacked blocks (mobile-first, RTL):
+
+1. **Hero**: greeting + streak + XP + today progress ring + one-line motivational AI insight.
+2. **Quick Actions row**: Start Timer · Add Session · Add Task · Add Note (chip buttons).
+3. **Today's Sessions**: new `SessionCard` list with visible CRUD.
+4. **Today's Tasks**: compact task list + quick-add.
+5. **Quick Notes**: 3 most-recent + pinned, "+ note" button.
+6. **Smart AI Panel**: weak subject warning, recommended next subject, productivity trend (local computation from `analytics.ts`).
+7. **Subjects Grid** (existing).
+
+Keep the existing premium glass theme. Improve spacing, typography hierarchy, larger tap targets.
+
+## 6. AI Memory Engine — Real, Not Generic
+
+Server-side (`supabase/functions/study-advisor/index.ts`):
+
+Extend the live `📌 امروز` block and add new authoritative blocks the model **must quote**:
+
+- **TODAY**: every session today (subject, exact start time, duration mm:ss, mode, productivity, tags, notes excerpt). Total per subject + grand total.
+- **YESTERDAY**: same compact summary.
+- **NOT STUDIED**: subjects with zero minutes in last 7 days.
+- **PENDING TASKS**: title, due date, priority, overdue flag.
+- **COMPLETED TODAY**: tasks closed today.
+- **RECENT EDITS** (24h): from `session_edits` — "Biology session changed from 20m → 45m at 14:32".
+- **DELETED TODAY**: list (so AI never counts them).
+- **NOTES** (5 most recent + all pinned): title + first 200 chars.
+- **WEAK / STRONG**: by 7-day minutes vs `subjects.importance_weight`.
+- **STREAK + CONSISTENCY**: from `user_xp` + last 14 days.
+
+System-prompt rules (append):
+- Never say "اطلاعاتی ندارم" — quote the blocks.
+- For "امروز چی خوندم" → enumerate TODAY block exactly.
+- For "چی تموم نکردم" → enumerate PENDING TASKS.
+- For "چی تغییر کرد" → quote RECENT EDITS.
+- Never reference deleted sessions in totals.
+- Always reply in Persian, friendly, concise.
+
+Client (`aiContextDispatcher.ts`): already wired. Add dispatch calls from new note hooks.
+
+## 7. State Management & Realtime
+
+- All mutations use React Query optimistic updates + `invalidateQueries` + `dispatchAIContextRefresh(reason)`.
+- Add Supabase realtime subscription for `notes` and existing `tasks`/`study_sessions` (sessions already have one in queue sync). This guarantees instant cross-device + cross-tab refresh.
+
+## 8. Polish
+
+- Loading skeletons for each Home block.
+- Empty states with single primary CTA.
+- Framer-motion enter/exit on session/task/note add+remove.
+- Larger 40px+ tap targets for primary actions.
+
+## Out of Scope (explicit)
+
+- Theme engine rebuild (already done).
+- Onboarding rewrite (already done).
+- Timer logic changes.
+- Calendar sync to external calendars (mentioned but heavy; will add a placeholder-free local calendar view only if time).
+
+## Technical Notes
+
+- New files: `src/components/sessions/SessionCard.tsx`, `SessionDetailsSheet.tsx`; `src/components/notes/{NotesList,NoteEditor,QuickNotes}.tsx`; `src/hooks/useNotes.ts`, `useDuplicateSession` (added to `useStudySessions.ts`); `src/pages/Notes.tsx`; new migration file.
+- Edited: `Dashboard.tsx`, `Tasks.tsx`, `DailyPlanner.tsx`, `StudyTimeline.tsx`, `SessionEditDialog.tsx`, `BottomNav.tsx`, `App.tsx`, `study-advisor/index.ts`, `refresh-ai-context/index.ts`.
+- Migration is the first step; after approval I'll implement everything else in one pass.
+
+Approve to proceed.

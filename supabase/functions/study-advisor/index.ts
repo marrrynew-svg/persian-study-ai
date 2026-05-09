@@ -143,10 +143,12 @@ function buildFullContext(data: {
   skipProb: number;
   recentEdits?: any[];
   planItems?: any[];
+  notes?: any[];
 }): string {
   const { profile, subjects, sessions, tasks, xp, memory, recentConversations, behaviorProfile, daysLeft, burnoutRisk } = data;
   const recentEdits = data.recentEdits || [];
   const planItems = data.planItems || [];
+  const notes = data.notes || [];
 
   const subjectDetail = subjects.map((s: any) => {
     const subSessions = sessions.filter((ss: any) => ss.subject_id === s.id);
@@ -165,6 +167,7 @@ function buildFullContext(data: {
 
   // ── TODAY block (live, authoritative) ──
   const todayStr = new Date().toISOString().split("T")[0];
+  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split("T")[0];
   const todaySessions = sessions.filter((s: any) => s.started_at?.startsWith(todayStr));
   const todayMinutes = todaySessions.reduce((a: number, s: any) => a + (s.duration_minutes || 0), 0);
   const todaySeconds = todaySessions.reduce((a: number, s: any) => a + (s.duration_seconds || 0), 0);
@@ -189,6 +192,26 @@ function buildFullContext(data: {
   const todayTasksText =
     `  ✅ انجام‌شده امروز (${todayDoneTasks.length}): ${todayDoneTasks.map((t: any) => t.title).join("، ") || "هیچ‌کدام"}\n` +
     `  ⏳ باقی‌مانده امروز (${todayPendingTasks.length}): ${todayPendingTasks.map((t: any) => t.title).join("، ") || "هیچ‌کدام"}`;
+
+  // Yesterday block
+  const yesterdaySessions = sessions.filter((s: any) => s.started_at?.startsWith(yesterdayStr));
+  const yesterdayMin = yesterdaySessions.reduce((a: number, s: any) => a + (s.duration_minutes || 0), 0);
+  const yesterdayBy: Record<string, number> = {};
+  for (const s of yesterdaySessions) {
+    const n = s.subjects?.name || "بدون درس";
+    yesterdayBy[n] = (yesterdayBy[n] || 0) + (s.duration_minutes || 0);
+  }
+  const yesterdayText = yesterdaySessions.length
+    ? `${yesterdayMin} دقیقه در ${yesterdaySessions.length} جلسه — ${Object.entries(yesterdayBy).map(([n,m])=>`${n}: ${m}د`).join("، ")}`
+    : "هیچ جلسه‌ای دیروز ثبت نشده";
+
+  // Subjects not studied in last 7 days
+  const weekStartIso = new Date(Date.now() - 7 * 86400000);
+  const studiedIds = new Set(sessions.filter((s:any) => new Date(s.started_at) >= weekStartIso).map((s:any) => s.subject_id).filter(Boolean));
+  const notStudied = subjects.filter((s: any) => !studiedIds.has(s.id));
+  const notStudiedText = notStudied.length
+    ? notStudied.map((s: any) => `  • ${s.icon || "📘"} ${s.name}`).join("\n")
+    : "  همه دروس در ۷ روز اخیر دست‌کم یک‌بار مطالعه شدن ✅";
 
   // ── Pending tasks (overdue + no due) ──
   const overdueTasks = tasks.filter((t: any) => !t.completed && t.due_date && String(t.due_date) < todayStr);
@@ -235,6 +258,16 @@ function buildFullContext(data: {
   const planText = todayPlan.length
     ? `  برنامه‌ریزی‌شده: ${plannedMin} دقیقه | انجام‌شده: ${todayMinutes} دقیقه${adherence !== null ? ` | تطابق: ${adherence}٪` : ""}`
     : "  برنامه‌ای برای امروز ثبت نشده";
+
+  // Notes block
+  const pinnedNotes = notes.filter((n:any) => n.pinned);
+  const recentNotes = notes.filter((n:any) => !n.pinned).slice(0, 5);
+  const notesText = (pinnedNotes.length || recentNotes.length)
+    ? [
+        ...pinnedNotes.map((n:any) => `  📌 ${n.title || "بدون عنوان"} — ${(n.content || "").slice(0, 200).replace(/\n/g," ")}`),
+        ...recentNotes.map((n:any) => `  📝 ${n.title || "بدون عنوان"} — ${(n.content || "").slice(0, 160).replace(/\n/g," ")}`),
+      ].join("\n")
+    : "  هیچ یادداشتی ثبت نشده";
 
   const longTermMemory = memory.filter((m: any) => m.memory_type === "long_term")
     .map((m: any) => `  [${m.category}] ${m.key}: ${m.value}`)
@@ -299,6 +332,15 @@ ${planText}
 
 تغییرات اخیر در جلسات (۲۴ ساعت گذشته):
 ${editsText}
+
+📚 دروس مطالعه‌نشده در ۷ روز اخیر:
+${notStudiedText}
+
+🕐 خلاصه دیروز (${yesterdayStr}):
+${yesterdayText}
+
+🗒️ یادداشت‌های کاربر (سنجاق‌شده + ۵ تای آخر):
+${notesText}
 
 ═══════════════════════════════════════
 📅 خلاصه ۷ روز گذشته (به تفکیک درس)
@@ -566,6 +608,8 @@ function buildSystemPrompt(mode: string, burnoutRisk: number, daysLeft: number |
 10. هر زمان کاربر پرسید «امروز چی خوندم» یا مشابه، دقیقاً اعداد بلوک «📌 امروز» را کلمه‌به‌کلمه نقل کن (مدت + درس + ساعت)، نه تخمین.
 11. جلسات حذف‌شده دیگر در محاسبات حساب نمی‌شوند. اگر کاربر پرسید «چی حذف کردم؟» یا «چی ویرایش کردم؟»، دقیقاً از بلوک «تغییرات اخیر در جلسات» نقل کن.
 12. اگر کاربر پرسید «چی نخوندم؟» یا «چی نیمه‌کاره مونده؟»، از بلوک «وظایف در انتظار» و «برنامه‌ریزی‌شده در مقابل انجام‌شده» جواب بده — نه از حافظه قدیمی.
+13. اگر کاربر پرسید «چی نوشتم؟»، «یادداشت‌هام چیه؟» یا مشابه، دقیقاً از بلوک «🗒️ یادداشت‌های کاربر» نقل کن. هرگز یادداشت اختراع نکن.
+14. اگر کاربر پرسید «دیروز چی خوندم؟»، فقط از بلوک «🕐 خلاصه دیروز» جواب بده. اگر پرسید «این هفته چی نخوندم؟»، از بلوک «📚 دروس مطالعه‌نشده در ۷ روز اخیر» نقل کن.
 
 ${burnoutInstruction}
 ${emergencyInstruction}
@@ -702,6 +746,7 @@ serve(async (req) => {
       conversationsResult,
       editsResult,
       plansResult,
+      notesResult,
     ] = await Promise.all([
       supabaseAdmin.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
       supabaseAdmin.from("subjects").select("*").eq("user_id", userId).order("importance_weight", { ascending: false }),
@@ -712,7 +757,8 @@ serve(async (req) => {
       supabaseAdmin.from("ai_conversations").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(20),
       supabaseAdmin.from("session_edits").select("*").eq("user_id", userId).gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()).order("created_at", { ascending: false }).limit(40),
       supabaseAdmin.from("plan_items").select("*, subjects(name, icon)").eq("user_id", userId).limit(40),
-    ]);
+      supabaseAdmin.from("notes").select("id,title,content,pinned,tags,updated_at").eq("user_id", userId).order("updated_at", { ascending: false }).limit(20),
+    ] as any);
 
     const profile = profileResult.data;
     const subjects = subjectsResult.data || [];
@@ -723,6 +769,7 @@ serve(async (req) => {
     const recentConversations = (conversationsResult.data || []).reverse();
     const recentEdits = editsResult.data || [];
     const planItems = plansResult.data || [];
+    const notes = (notesResult as any)?.data || [];
 
     // ── Behavioral Analysis ──
     const burnoutRisk = computeBurnoutRisk(sessions);
@@ -739,7 +786,7 @@ serve(async (req) => {
     const fullContext = buildFullContext({
       profile, subjects, sessions, tasks, xp, memory, recentConversations,
       behaviorProfile, daysLeft, burnoutRisk, motivationScore, consistencyScore, skipProb,
-      recentEdits, planItems,
+      recentEdits, planItems, notes,
     });
 
     const emotionalState = detectEmotionalState(message);

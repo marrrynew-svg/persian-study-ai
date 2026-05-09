@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Timer, CalendarDays, Brain, User, Users } from "lucide-react";
+import { Home, Timer, CalendarDays, Brain, User, StickyNote } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -7,7 +7,7 @@ const navItems = [
   { path: "/", icon: Home, label: "خانه" },
   { path: "/timer", icon: Timer, label: "تایمر" },
   { path: "/planner", icon: CalendarDays, label: "برنامه" },
-  { path: "/groups", icon: Users, label: "گروه‌ها" },
+  { path: "/notes", icon: StickyNote, label: "یادداشت" },
   { path: "/advisor", icon: Brain, label: "مشاور" },
   { path: "/profile", icon: User, label: "پروفایل" },
 ];

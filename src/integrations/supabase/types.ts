@@ -267,6 +267,48 @@ export type Database = {
           },
         ]
       }
+      notes: {
+        Row: {
+          content: string
+          created_at: string
+          folder: string | null
+          id: string
+          pinned: boolean
+          session_id: string | null
+          subject_id: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          folder?: string | null
+          id?: string
+          pinned?: boolean
+          session_id?: string | null
+          subject_id?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          folder?: string | null
+          id?: string
+          pinned?: boolean
+          session_id?: string | null
+          subject_id?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       performance_logs: {
         Row: {
           completion_rate: number | null
@@ -642,11 +684,13 @@ export type Database = {
           id: string
           mode: string
           notes: string | null
+          productivity_rating: number | null
           quality: string | null
           session_type: string | null
           source: string
           started_at: string
           subject_id: string | null
+          tags: string[]
           updated_at: string
           user_id: string
         }
@@ -662,11 +706,13 @@ export type Database = {
           id?: string
           mode?: string
           notes?: string | null
+          productivity_rating?: number | null
           quality?: string | null
           session_type?: string | null
           source?: string
           started_at?: string
           subject_id?: string | null
+          tags?: string[]
           updated_at?: string
           user_id: string
         }
@@ -682,11 +728,13 @@ export type Database = {
           id?: string
           mode?: string
           notes?: string | null
+          productivity_rating?: number | null
           quality?: string | null
           session_type?: string | null
           source?: string
           started_at?: string
           subject_id?: string | null
+          tags?: string[]
           updated_at?: string
           user_id?: string
         }
@@ -738,37 +786,55 @@ export type Database = {
       }
       tasks: {
         Row: {
+          category: string | null
           completed: boolean | null
+          completed_at: string | null
           created_at: string
           description: string | null
           due_date: string | null
           id: string
+          parent_task_id: string | null
+          position: number
           priority: string | null
+          recurrence: string
           subject_id: string | null
+          tags: string[]
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          category?: string | null
           completed?: boolean | null
+          completed_at?: string | null
           created_at?: string
           description?: string | null
           due_date?: string | null
           id?: string
+          parent_task_id?: string | null
+          position?: number
           priority?: string | null
+          recurrence?: string
           subject_id?: string | null
+          tags?: string[]
           title: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          category?: string | null
           completed?: boolean | null
+          completed_at?: string | null
           created_at?: string
           description?: string | null
           due_date?: string | null
           id?: string
+          parent_task_id?: string | null
+          position?: number
           priority?: string | null
+          recurrence?: string
           subject_id?: string | null
+          tags?: string[]
           title?: string
           updated_at?: string
           user_id?: string

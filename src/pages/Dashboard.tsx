@@ -31,6 +31,9 @@ import { SubjectGrid } from "@/components/dashboard/SubjectGrid";
 import { SmartInsights } from "@/components/dashboard/SmartInsights";
 import { GoalProgress } from "@/components/dashboard/GoalProgress";
 import { InteractiveCalendar } from "@/components/dashboard/InteractiveCalendar";
+import { QuickActions } from "@/components/dashboard/QuickActions";
+import { QuickNotes } from "@/components/dashboard/QuickNotes";
+import { TodayTasks } from "@/components/dashboard/TodayTasks";
 
 export default function Dashboard() {
   const { data: profile, isLoading: profileLoading } = useProfile();
@@ -189,6 +192,21 @@ export default function Dashboard() {
         {/* Today's timeline */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
           <StudyTimeline sessions={todaySessions} />
+        </motion.div>
+
+        {/* Quick actions */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.29 }}>
+          <QuickActions />
+        </motion.div>
+
+        {/* Today's tasks */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+          <TodayTasks />
+        </motion.div>
+
+        {/* Quick notes */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.31 }}>
+          <QuickNotes />
         </motion.div>
 
         {/* Subject grid (this week) */}
