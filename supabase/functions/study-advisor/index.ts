@@ -760,6 +760,17 @@ serve(async (req) => {
       supabaseAdmin.from("notes").select("id,title,content,pinned,tags,updated_at").eq("user_id", userId).order("updated_at", { ascending: false }).limit(20),
     ] as any);
 
+    const [examsRes, topicsRes, blocksRes, lpRes] = await Promise.all([
+      supabaseAdmin.from("exams").select("*").eq("user_id", userId).order("exam_date"),
+      supabaseAdmin.from("exam_topics").select("*").eq("user_id", userId),
+      supabaseAdmin.from("roadmap_blocks").select("*").eq("user_id", userId).gte("date", new Date().toISOString().split("T")[0]).lte("date", new Date(Date.now()+7*86400000).toISOString().split("T")[0]).order("date").order("start_time"),
+      supabaseAdmin.from("learning_profile").select("*").eq("user_id", userId).maybeSingle(),
+    ] as any);
+    const examsData = (examsRes as any)?.data || [];
+    const topicsData = (topicsRes as any)?.data || [];
+    const blocksData = (blocksRes as any)?.data || [];
+    const lp = (lpRes as any)?.data;
+
     const profile = profileResult.data;
     const subjects = subjectsResult.data || [];
     const sessions = sessionsResult.data || [];
@@ -789,6 +800,49 @@ serve(async (req) => {
       recentEdits, planItems, notes,
     });
 
+    // ── ROADMAP / EXAMS context block ──
+    const today = new Date().toISOString().split("T")[0];
+    const examsBlock = examsData.length ? examsData.map((e: any) => {
+      const dl = Math.max(0, Math.ceil((new Date(e.exam_date).getTime() - Date.now()) / 86400000));
+      const ts = topicsData.filter((t: any) => t.exam_id === e.id);
+      const total = ts.reduce((a: number, t: any) => a + (t.estimated_minutes || 0), 0);
+      const done = ts.reduce((a: number, t: any) => a + (t.completed_minutes || 0), 0);
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      return `  • ${e.title} (${e.exam_type}) — ${dl} روز مونده — اولویت ${e.priority}/5 — ${pct}٪ تکمیل (${ts.length} سرفصل)`;
+    }).join("\n") : "  هیچ آزمونی تعریف نشده";
+    const topTopics = topicsData
+      .filter((t: any) => t.status !== "done")
+      .map((t: any) => {
+        const e = examsData.find((x: any) => x.id === t.exam_id);
+        const dl = e ? Math.max(1, Math.ceil((new Date(e.exam_date).getTime() - Date.now()) / 86400000)) : 999;
+        const remaining = Math.max(0, (t.estimated_minutes || 0) - (t.completed_minutes || 0));
+        const score = ((e?.priority || 3) * (e?.importance || 3)) / dl;
+        return { t, dl, remaining, score };
+      })
+      .sort((a: any, b: any) => b.score - a.score).slice(0, 8);
+    const topicsBlock = topTopics.length ? topTopics.map(({ t, dl, remaining }: any) =>
+      `  • ${t.title} — ${remaining} دقیقه باقی — ${dl} روز تا آزمون`).join("\n") : "  هیچ سرفصلی در انتظار";
+    const todayBlocks = blocksData.filter((b: any) => b.date === today);
+    const todayRoadmap = todayBlocks.length ? todayBlocks.map((b: any) =>
+      `  • [${(b.start_time || "").slice(0,5)}–${(b.end_time || "").slice(0,5)}] ${b.block_type} — ${b.duration_minutes}د — ${b.reason || ""} (${b.status})`).join("\n") : "  هیچ بلوکی برای امروز ساخته نشده";
+    const lpLine = lp ? `  سرعت ${lp.reading_speed} · عمق ${lp.study_depth} · تمرکز ${lp.focus_minutes}د · پنجره ${lp.peak_window} · ${lp.weekly_available_hours}س/هفته` : "  پروفایل یادگیری ثبت نشده";
+
+    const roadmapContext = `
+═══════════════════════════════════════
+🎯 آزمون‌های پیش‌رو (داده‌های قطعی):
+═══════════════════════════════════════
+${examsBlock}
+
+📚 سرفصل‌های فوری (به ترتیب اولویت):
+${topicsBlock}
+
+📋 بلوک‌های نقشه راه امروز:
+${todayRoadmap}
+
+🧬 پروفایل یادگیری:
+${lpLine}
+═══════════════════════════════════════`;
+
     const emotionalState = detectEmotionalState(message);
     const systemPrompt = buildSystemPrompt(mode, burnoutRisk, daysLeft, emotionalState);
 
@@ -811,7 +865,7 @@ serve(async (req) => {
 
     const messages = [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `${fullContext}\n\n🎭 وضعیت عاطفی تشخیص‌داده‌شده: ${emotionalState}` },
+      { role: "user", content: `${fullContext}\n${roadmapContext}\n\n🎭 وضعیت عاطفی تشخیص‌داده‌شده: ${emotionalState}` },
       ...conversationHistory,
       { role: "user", content: message },
     ];
