@@ -191,6 +191,119 @@ export type Database = {
         }
         Relationships: []
       }
+      exam_topics: {
+        Row: {
+          completed_minutes: number
+          created_at: string
+          difficulty: number
+          estimated_minutes: number
+          exam_id: string
+          id: string
+          needs_practice_tests: boolean
+          order_index: number
+          revisions_needed: number
+          status: string
+          subject_id: string | null
+          title: string
+          total_pages: number
+          total_video_minutes: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_minutes?: number
+          created_at?: string
+          difficulty?: number
+          estimated_minutes?: number
+          exam_id: string
+          id?: string
+          needs_practice_tests?: boolean
+          order_index?: number
+          revisions_needed?: number
+          status?: string
+          subject_id?: string | null
+          title: string
+          total_pages?: number
+          total_video_minutes?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_minutes?: number
+          created_at?: string
+          difficulty?: number
+          estimated_minutes?: number
+          exam_id?: string
+          id?: string
+          needs_practice_tests?: boolean
+          order_index?: number
+          revisions_needed?: number
+          status?: string
+          subject_id?: string | null
+          title?: string
+          total_pages?: number
+          total_video_minutes?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_topics_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exams: {
+        Row: {
+          created_at: string
+          difficulty: number
+          exam_date: string
+          exam_type: string
+          id: string
+          importance: number
+          notes: string | null
+          priority: number
+          status: string
+          target_score: number | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          difficulty?: number
+          exam_date: string
+          exam_type?: string
+          id?: string
+          importance?: number
+          notes?: string | null
+          priority?: number
+          status?: string
+          target_score?: number | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          difficulty?: number
+          exam_date?: string
+          exam_type?: string
+          id?: string
+          importance?: number
+          notes?: string | null
+          priority?: number
+          status?: string
+          target_score?: number | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       group_members: {
         Row: {
           display_name: string | null
@@ -266,6 +379,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      learning_profile: {
+        Row: {
+          analytical_strength: number
+          break_minutes: number
+          consistency: number
+          created_at: string
+          distractibility: number
+          fatigue_curve: number
+          focus_minutes: number
+          id: string
+          memorization_strength: number
+          methods: string[]
+          notes_intensity: number
+          pause_frequency: number
+          peak_window: string
+          prefers_practice_tests: boolean
+          reading_speed: string
+          study_depth: string
+          updated_at: string
+          user_id: string
+          video_speed: number
+          weekend_multiplier: number
+          weekly_available_hours: number
+        }
+        Insert: {
+          analytical_strength?: number
+          break_minutes?: number
+          consistency?: number
+          created_at?: string
+          distractibility?: number
+          fatigue_curve?: number
+          focus_minutes?: number
+          id?: string
+          memorization_strength?: number
+          methods?: string[]
+          notes_intensity?: number
+          pause_frequency?: number
+          peak_window?: string
+          prefers_practice_tests?: boolean
+          reading_speed?: string
+          study_depth?: string
+          updated_at?: string
+          user_id: string
+          video_speed?: number
+          weekend_multiplier?: number
+          weekly_available_hours?: number
+        }
+        Update: {
+          analytical_strength?: number
+          break_minutes?: number
+          consistency?: number
+          created_at?: string
+          distractibility?: number
+          fatigue_curve?: number
+          focus_minutes?: number
+          id?: string
+          memorization_strength?: number
+          methods?: string[]
+          notes_intensity?: number
+          pause_frequency?: number
+          peak_window?: string
+          prefers_practice_tests?: boolean
+          reading_speed?: string
+          study_depth?: string
+          updated_at?: string
+          user_id?: string
+          video_speed?: number
+          weekend_multiplier?: number
+          weekly_available_hours?: number
+        }
+        Relationships: []
       }
       notes: {
         Row: {
@@ -598,6 +783,105 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      roadmap_blocks: {
+        Row: {
+          auto_generated: boolean
+          block_type: string
+          created_at: string
+          date: string
+          duration_minutes: number
+          end_time: string | null
+          exam_id: string | null
+          id: string
+          notes: string | null
+          priority: number
+          reason: string | null
+          start_time: string | null
+          status: string
+          subject_id: string | null
+          topic_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_generated?: boolean
+          block_type?: string
+          created_at?: string
+          date: string
+          duration_minutes?: number
+          end_time?: string | null
+          exam_id?: string | null
+          id?: string
+          notes?: string | null
+          priority?: number
+          reason?: string | null
+          start_time?: string | null
+          status?: string
+          subject_id?: string | null
+          topic_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_generated?: boolean
+          block_type?: string
+          created_at?: string
+          date?: string
+          duration_minutes?: number
+          end_time?: string | null
+          exam_id?: string | null
+          id?: string
+          notes?: string | null
+          priority?: number
+          reason?: string | null
+          start_time?: string | null
+          status?: string
+          subject_id?: string | null
+          topic_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roadmap_blocks_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadmap_blocks_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "exam_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roadmap_runs: {
+        Row: {
+          generated_at: string
+          id: string
+          strategy: string
+          summary: Json
+          user_id: string
+        }
+        Insert: {
+          generated_at?: string
+          id?: string
+          strategy?: string
+          summary?: Json
+          user_id: string
+        }
+        Update: {
+          generated_at?: string
+          id?: string
+          strategy?: string
+          summary?: Json
+          user_id?: string
+        }
+        Relationships: []
       }
       session_edits: {
         Row: {

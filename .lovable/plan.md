@@ -1,106 +1,116 @@
-# Product Rebuild Plan — Sessions, AI Memory, Notes, Tasks, Home
+# AI Academic Operating System — Build Plan
 
-This is a large multi-system rebuild. I'll ship it in one cohesive update, in the order below, so every layer (DB → hooks → UI → AI) stays in sync.
+A production-grade exam-driven study planner with real time estimation, adaptive scheduling, deep profiling, cinematic timeline, and full AI chatbot awareness.
 
-## 1. Database Migrations
+This is large. I'll ship it in 4 sequenced phases, each compiling and usable on its own. After you approve the plan, I'll start with Phase 1 (DB + estimation engine), then continue straight through Phases 2–4 in the same loop.
 
-New tables + columns to support the full product:
+---
 
-- **`notes`** table: `id, user_id, title, content (markdown), pinned bool, folder text, tags text[], subject_id, session_id (nullable link), created_at, updated_at`. RLS: users manage own.
-- **`tasks`** — add columns: `tags text[]`, `category text`, `recurrence text` (none|daily|weekly), `parent_task_id uuid` (subtasks), `position int`, `completed_at timestamptz`.
-- **`study_sessions`** — add `tags text[]`, `productivity_rating int (1–5)`, `focus_quality text` (already have `quality`, will reuse). Confirm `notes`, `deleted_at`, `edited_at` exist (they do).
-- Indexes for `notes(user_id, updated_at)`, `tasks(user_id, parent_task_id)`.
+## Phase 1 — Data model + estimation engine (foundation)
 
-## 2. Session CRUD — Make Actions Visible & Powerful
+### New tables
+- `exams` — `id, user_id, title, exam_type (test|descriptive|mixed), exam_date, priority (1-5), difficulty (1-5), target_score, importance, status (upcoming|active|done), notes, created_at, updated_at`
+- `exam_topics` — `id, exam_id, user_id, subject_id, title, total_pages, total_video_minutes, difficulty (1-5), revisions_needed (default 2), needs_practice_tests bool, estimated_minutes (computed by engine), completed_minutes, status (pending|in_progress|done), order_index`
+- `learning_profile` (1 row per user) — covers everything the deep interview captures: `reading_speed (slow|medium|fast)`, `study_depth (deep|balanced|fast)`, `focus_minutes`, `break_minutes`, `peak_window (morning|afternoon|evening|night)`, `consistency (1-5)`, `distractibility (1-5)`, `fatigue_curve (1-5)`, `methods text[]` (video/book/teacher/summary/flashcards/tests/problems), `video_speed`, `pause_frequency`, `notes_intensity (1-5)`, `memorization_strength (1-5)`, `analytical_strength (1-5)`, `weekly_available_hours`, `weekend_multiplier`, `prefers_practice_tests bool`, `created_at`, `updated_at`
+- `roadmap_blocks` — generated study blocks: `id, user_id, exam_id (nullable), topic_id (nullable), subject_id (nullable), date, start_time, end_time, duration_minutes, block_type (study|review|test|buffer|recovery), priority, status (planned|done|skipped|moved), auto_generated bool, notes`
+- `roadmap_runs` — audit of generations: `id, user_id, generated_at, strategy text, summary jsonb`
 
-Replace the hidden popover-only menu with **inline visible action buttons** on every session card:
+All RLS: `auth.uid() = user_id`. Indexes on `(user_id, date)` and `(exam_id)`.
 
-- New component `SessionCard` with always-visible icon buttons: ✏️ Edit · 📋 Duplicate · 🗒️ Add Note · 🗑️ Delete, plus a "Details" tap target.
-- Used in `DailyPlanner`, `StudyTimeline`, and a new "Today's Sessions" home block.
-- Enhance `SessionEditDialog`: subject, date, start time, end time (auto-compute duration), duration override, mode, productivity rating (1–5 stars), tags, notes — all in one elegant modal.
-- New hook `useDuplicateSession` (creates a copy now-shifted).
-- New hook `useAddSessionNote` (creates a `notes` row linked via `session_id` and refreshes AI context).
-- New `SessionDetailsSheet` (slide-over): full info, edit timeline from `session_edits`, linked notes, tags, AI insight (local heuristic).
-- Trash/Restore: keep on Analytics page (already exists), add a quick-link from Home when trash > 0.
+### Estimation engine (`src/lib/estimationEngine.ts`)
+Pure TS, deterministic, fully unit-testable. Inputs: topic + learning profile. Output: realistic minutes.
 
-## 3. Notes System
+```
+base = pages * pageMinutes(reading_speed, depth)
+     + video_minutes / video_speed * (1 + pause_frequency * 0.15)
+difficultyFactor   = 0.7 + difficulty * 0.15           // 1-5 → 0.85..1.45
+methodFactor       = video ? 1.1 : book ? 1.0 : ...
+revisionFactor     = 1 + revisions * 0.35
+practiceFactor     = needs_tests ? 1.25 : 1
+fatigueFactor      = 1 + (6 - focus_minutes/15) * 0.05
+total = base * difficultyFactor * methodFactor * revisionFactor * practiceFactor * fatigueFactor
+```
+Returns `{ studyMin, reviewMin, testMin, totalMin, breakdown }`.
 
-- Routes: `/notes` (list + editor split view) + quick-note widget on Home.
-- `NotesList`: search, folder filter, tag filter, pinned-first.
-- `NoteEditor`: markdown textarea with live preview (use existing `react-markdown` if present, else simple textarea + preview). Pin/unpin, folder, tags, link-to-subject/session.
-- Hooks: `useNotes`, `useUpsertNote`, `useDeleteNote`, `useTogglePin` — all dispatch AI context refresh.
-- Add nav entry in `BottomNav`.
+### Planner engine (`src/lib/plannerEngine.ts`)
+Given exams + topics + profile + existing sessions:
+1. Compute remaining minutes per topic (estimated − completed).
+2. Score urgency = `(daysUntilExam ↓) * priority * importance / sqrt(remainingMin)`.
+3. Allocate daily capacity = `weekly_available_hours/7` (×weekend_multiplier on Fri/Sat).
+4. Pack blocks per day: highest-urgency topic first, cap per-subject per-day to avoid overload, insert review every N study sessions (spaced repetition: 1d, 3d, 7d, 14d), insert one buffer day per week, recovery day if streak fatigue high.
+5. Respect peak window (morning/evening) for hard topics.
+6. Write `roadmap_blocks` rows in a single transaction; record run summary.
 
-## 4. Task Manager Upgrade
+Adaptation: if any block status flips to `skipped` or actual study < planned for 2+ days, the engine reruns and shifts unfinished work forward, never piling more than 130% capacity into any day.
 
-- Enhance `/tasks` page: filters (today / upcoming / overdue / completed), priority pill, drag-to-reorder (using `@dnd-kit/core` if installed, else simple up/down arrows), subtask expand, tags chips, due-date picker.
-- Quick-add input on Home with priority + due-date inline.
-- New hooks: `useReorderTasks`, `useAddSubtask`. Existing `useToggleTask` already dispatches AI refresh.
+---
 
-## 5. Home Redesign
+## Phase 2 — Deep onboarding interview + exam wizard
 
-Single composed `Dashboard.tsx` with these stacked blocks (mobile-first, RTL):
+### Adaptive interview (`src/pages/LearningProfileWizard.tsx`)
+- Multi-step (10–12 screens), conditional branching (video/book paths), emoji-led answers, progress bar.
+- Captures every field in `learning_profile`. Uses `useLearningProfile` hook (RQ + realtime).
+- Final screen runs `estimationEngine` on a sample topic so the user *sees* the realism.
 
-1. **Hero**: greeting + streak + XP + today progress ring + one-line motivational AI insight.
-2. **Quick Actions row**: Start Timer · Add Session · Add Task · Add Note (chip buttons).
-3. **Today's Sessions**: new `SessionCard` list with visible CRUD.
-4. **Today's Tasks**: compact task list + quick-add.
-5. **Quick Notes**: 3 most-recent + pinned, "+ note" button.
-6. **Smart AI Panel**: weak subject warning, recommended next subject, productivity trend (local computation from `analytics.ts`).
-7. **Subjects Grid** (existing).
+### Exam wizard (`src/pages/ExamWizard.tsx` + `/exams` list page)
+- Step 1: title, type, date, priority, difficulty, target score.
+- Step 2: pick subjects + add topics (title, pages, video min, difficulty, revisions, practice toggle).
+- Step 3: live preview — engine shows estimated total hours, days needed, suggested daily load, feasibility verdict ("✅ feasible" / "⚠️ tight" / "❌ unrealistic — extend date or cut topics").
+- Saves `exams` + `exam_topics`, then triggers planner regeneration.
 
-Keep the existing premium glass theme. Improve spacing, typography hierarchy, larger tap targets.
+---
 
-## 6. AI Memory Engine — Real, Not Generic
+## Phase 3 — Cinematic timeline + smart daily plan UI
 
-Server-side (`supabase/functions/study-advisor/index.ts`):
+### Timeline (`src/components/roadmap/RoadmapTimeline.tsx`)
+- Horizontal scroll, weeks as columns, exams as vertical milestone pillars with countdown.
+- Phase bands: Foundation → Build → Review → Final Sprint (computed from exam date proximity).
+- Urgency color gradient (green→amber→red) per day based on packed minutes vs capacity.
+- Drag a block to reschedule (writes back to `roadmap_blocks`, triggers re-validate).
+- Framer-motion enter/zoom; tap a day → opens day detail sheet.
 
-Extend the live `📌 امروز` block and add new authoritative blocks the model **must quote**:
+### Daily plan (`src/components/roadmap/SmartDailyPlan.tsx`)
+- Replaces the existing simple daily list on Dashboard.
+- Shows ordered blocks with type icon (📖 study, 🔁 review, 📝 test, ☕ buffer), exact start/end, subject, topic, "why this now" reason chip.
+- One-tap: "Start in Timer" / "Mark done" / "Skip → reschedule".
 
-- **TODAY**: every session today (subject, exact start time, duration mm:ss, mode, productivity, tags, notes excerpt). Total per subject + grand total.
-- **YESTERDAY**: same compact summary.
-- **NOT STUDIED**: subjects with zero minutes in last 7 days.
-- **PENDING TASKS**: title, due date, priority, overdue flag.
-- **COMPLETED TODAY**: tasks closed today.
-- **RECENT EDITS** (24h): from `session_edits` — "Biology session changed from 20m → 45m at 14:32".
-- **DELETED TODAY**: list (so AI never counts them).
-- **NOTES** (5 most recent + all pinned): title + first 200 chars.
-- **WEAK / STRONG**: by 7-day minutes vs `subjects.importance_weight`.
-- **STREAK + CONSISTENCY**: from `user_xp` + last 14 days.
+### Insights (`src/components/roadmap/SmartInsightsPanel.tsx`)
+Computed locally from sessions + roadmap:
+- "You're 3.2h behind on Biology this week."
+- "At current pace, Physics finishes 4 days after exam — increase by 25 min/day."
+- "Focus drops after ~`focus_minutes` — 2 of 5 sessions yesterday exceeded this."
+- "Practice-test sessions correlate with +12% productivity for you."
 
-System-prompt rules (append):
-- Never say "اطلاعاتی ندارم" — quote the blocks.
-- For "امروز چی خوندم" → enumerate TODAY block exactly.
-- For "چی تموم نکردم" → enumerate PENDING TASKS.
-- For "چی تغییر کرد" → quote RECENT EDITS.
-- Never reference deleted sessions in totals.
-- Always reply in Persian, friendly, concise.
+---
 
-Client (`aiContextDispatcher.ts`): already wired. Add dispatch calls from new note hooks.
+## Phase 4 — AI chatbot full awareness
 
-## 7. State Management & Realtime
+Extend `supabase/functions/study-advisor/index.ts` context with new authoritative blocks the model must quote:
+- **EXAMS** — title, days left, type, priority, % topics completed, projected on-time bool.
+- **TOPICS PENDING** — top 8 by urgency with estimated remaining minutes.
+- **TODAY'S ROADMAP** — exact blocks (type, subject, time, status).
+- **LEARNING PROFILE SUMMARY** — speed/depth/focus/peak window in one line.
+- **ADAPTATION EVENTS (7d)** — which exams were rebalanced and why.
 
-- All mutations use React Query optimistic updates + `invalidateQueries` + `dispatchAIContextRefresh(reason)`.
-- Add Supabase realtime subscription for `notes` and existing `tasks`/`study_sessions` (sessions already have one in queue sync). This guarantees instant cross-device + cross-tab refresh.
+System-prompt rules added:
+- "What should I study tonight?" → quote TODAY'S ROADMAP blocks for evening window.
+- "Am I on track for X?" → quote EXAMS row for X with projected date.
+- Never invent topics; only reference rows from blocks above.
 
-## 8. Polish
+Client `aiContextDispatcher` fires on: exam create/update, topic complete, roadmap regenerate, profile change.
 
-- Loading skeletons for each Home block.
-- Empty states with single primary CTA.
-- Framer-motion enter/exit on session/task/note add+remove.
-- Larger 40px+ tap targets for primary actions.
+---
 
-## Out of Scope (explicit)
+## Out of scope (this build)
+- LLM-driven roadmap generation (engine is deterministic + fast; AI advises, doesn't plan). Adding LLM planner is an easy follow-up once the deterministic engine is solid.
+- External calendar sync.
+- Mobile push notifications.
+- Mock-exam grading.
 
-- Theme engine rebuild (already done).
-- Onboarding rewrite (already done).
-- Timer logic changes.
-- Calendar sync to external calendars (mentioned but heavy; will add a placeholder-free local calendar view only if time).
+## Technical notes
+- New files: 2 migrations, `estimationEngine.ts`, `plannerEngine.ts`, `useLearningProfile.ts`, `useExams.ts`, `useRoadmap.ts`, `LearningProfileWizard.tsx`, `ExamWizard.tsx`, `Exams.tsx`, `RoadmapTimeline.tsx`, `SmartDailyPlan.tsx`, `SmartInsightsPanel.tsx`, plus engine unit tests.
+- Edited: `Dashboard.tsx` (swap planner block for `SmartDailyPlan` + add timeline strip), `BottomNav.tsx` (add Roadmap tab), `study-advisor/index.ts`, `App.tsx` (routes), `aiContextDispatcher.ts`.
+- All mutations: optimistic RQ + invalidate + `dispatchAIContextRefresh`.
+- Realtime subscriptions on `exams`, `exam_topics`, `roadmap_blocks`.
 
-## Technical Notes
-
-- New files: `src/components/sessions/SessionCard.tsx`, `SessionDetailsSheet.tsx`; `src/components/notes/{NotesList,NoteEditor,QuickNotes}.tsx`; `src/hooks/useNotes.ts`, `useDuplicateSession` (added to `useStudySessions.ts`); `src/pages/Notes.tsx`; new migration file.
-- Edited: `Dashboard.tsx`, `Tasks.tsx`, `DailyPlanner.tsx`, `StudyTimeline.tsx`, `SessionEditDialog.tsx`, `BottomNav.tsx`, `App.tsx`, `study-advisor/index.ts`, `refresh-ai-context/index.ts`.
-- Migration is the first step; after approval I'll implement everything else in one pass.
-
-Approve to proceed.
+Approve to proceed — I'll start with the Phase 1 migration, then build straight through.
