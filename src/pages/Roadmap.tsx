@@ -97,7 +97,7 @@ export default function Roadmap() {
   const weather = calculateWeather({ streak, todayMinutes, daysToExam: nextExamDays });
 
   // --- RPG meta state (achievements / quests) ---
-  const weakSubject = (userProfile?.weakest_subjects as string[] | null)?.[0] ?? null;
+  const weakSubject = ((userProfile as any)?.weak_subjects?.[0]) ?? null;
   const dailyStudyHours = Math.max(1, Math.round(((profile?.weekly_available_hours || 14) / 7)));
   const { state: rpg, unlock, setQuestProgress } = useRPGState({ dailyStudyHours, weakSubject });
 
