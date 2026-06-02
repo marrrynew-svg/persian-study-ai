@@ -53,7 +53,7 @@ export function useLearningProfile() {
   useEffect(() => {
     if (!user) return;
     const ch = supabase
-      .channel(`learning_profile-${user.id}`)
+      .channel(`learning_profile-${user.id}-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "learning_profile", filter: `user_id=eq.${user.id}` }, () => {
         qc.invalidateQueries({ queryKey: ["learning_profile"] });
       })
