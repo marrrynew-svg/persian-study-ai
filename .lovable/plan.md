@@ -1,116 +1,139 @@
-# AI Academic Operating System — Build Plan
+# بازسازی کامل سیستم نقشه سفر (Roadmap)
 
-A production-grade exam-driven study planner with real time estimation, adaptive scheduling, deep profiling, cinematic timeline, and full AI chatbot awareness.
-
-This is large. I'll ship it in 4 sequenced phases, each compiling and usable on its own. After you approve the plan, I'll start with Phase 1 (DB + estimation engine), then continue straight through Phases 2–4 in the same loop.
+این یک refactor بزرگ است. نقشه سفر از یک "ویترین گرافیکی" به **قلب اپ** تبدیل می‌شود — جایی که هر جلسه‌ی تایمر، هر تسک، هر آزمون، و هر تصمیم AI روی آن اثر واقعی می‌گذارد.
 
 ---
 
-## Phase 1 — Data model + estimation engine (foundation)
+## ۱) مدل داده‌ی جدید (DB)
 
-### New tables
-- `exams` — `id, user_id, title, exam_type (test|descriptive|mixed), exam_date, priority (1-5), difficulty (1-5), target_score, importance, status (upcoming|active|done), notes, created_at, updated_at`
-- `exam_topics` — `id, exam_id, user_id, subject_id, title, total_pages, total_video_minutes, difficulty (1-5), revisions_needed (default 2), needs_practice_tests bool, estimated_minutes (computed by engine), completed_minutes, status (pending|in_progress|done), order_index`
-- `learning_profile` (1 row per user) — covers everything the deep interview captures: `reading_speed (slow|medium|fast)`, `study_depth (deep|balanced|fast)`, `focus_minutes`, `break_minutes`, `peak_window (morning|afternoon|evening|night)`, `consistency (1-5)`, `distractibility (1-5)`, `fatigue_curve (1-5)`, `methods text[]` (video/book/teacher/summary/flashcards/tests/problems), `video_speed`, `pause_frequency`, `notes_intensity (1-5)`, `memorization_strength (1-5)`, `analytical_strength (1-5)`, `weekly_available_hours`, `weekend_multiplier`, `prefers_practice_tests bool`, `created_at`, `updated_at`
-- `roadmap_blocks` — generated study blocks: `id, user_id, exam_id (nullable), topic_id (nullable), subject_id (nullable), date, start_time, end_time, duration_minutes, block_type (study|review|test|buffer|recovery), priority, status (planned|done|skipped|moved), auto_generated bool, notes`
-- `roadmap_runs` — audit of generations: `id, user_id, generated_at, strategy text, summary jsonb`
+جدول‌های جدید در Supabase (migration):
 
-All RLS: `auth.uid() = user_id`. Indexes on `(user_id, date)` and `(exam_id)`.
+- **`roadmap_nodes`** — نود واقعی نقشه (به جای صرفاً `roadmap_blocks`):
+  - `id, user_id, parent_id, exam_id, topic_id, subject_id`
+  - `title, description, type` (`study|exam|review|milestone|boss`)
+  - `xp_reward, estimated_minutes, due_date`
+  - `progress` (0..100), `study_minutes`, `last_studied_at`
+  - `status` (`locked|available|in_progress|completed`)
+  - `unlock_required_node_ids uuid[]`, `unlock_required_study_minutes int`
+  - `position_x, position_y` (برای adventure map)
+  - `world_kind` (`island|city|tower|cave|boss_arena`)
+  - `order_index, created_at, updated_at`
+- **`node_events`** — لاگ هر اثر روی نود (session/task/exam) برای AI و achievements.
+- **`achievements`** — مدال‌های unlock شده per-user (به جای localStorage).
 
-### Estimation engine (`src/lib/estimationEngine.ts`)
-Pure TS, deterministic, fully unit-testable. Inputs: topic + learning profile. Output: realistic minutes.
+همه با RLS + GRANT استاندارد.
 
-```
-base = pages * pageMinutes(reading_speed, depth)
-     + video_minutes / video_speed * (1 + pause_frequency * 0.15)
-difficultyFactor   = 0.7 + difficulty * 0.15           // 1-5 → 0.85..1.45
-methodFactor       = video ? 1.1 : book ? 1.0 : ...
-revisionFactor     = 1 + revisions * 0.35
-practiceFactor     = needs_tests ? 1.25 : 1
-fatigueFactor      = 1 + (6 - focus_minutes/15) * 0.05
-total = base * difficultyFactor * methodFactor * revisionFactor * practiceFactor * fatigueFactor
-```
-Returns `{ studyMin, reviewMin, testMin, totalMin, breakdown }`.
-
-### Planner engine (`src/lib/plannerEngine.ts`)
-Given exams + topics + profile + existing sessions:
-1. Compute remaining minutes per topic (estimated − completed).
-2. Score urgency = `(daysUntilExam ↓) * priority * importance / sqrt(remainingMin)`.
-3. Allocate daily capacity = `weekly_available_hours/7` (×weekend_multiplier on Fri/Sat).
-4. Pack blocks per day: highest-urgency topic first, cap per-subject per-day to avoid overload, insert review every N study sessions (spaced repetition: 1d, 3d, 7d, 14d), insert one buffer day per week, recovery day if streak fatigue high.
-5. Respect peak window (morning/evening) for hard topics.
-6. Write `roadmap_blocks` rows in a single transaction; record run summary.
-
-Adaptation: if any block status flips to `skipped` or actual study < planned for 2+ days, the engine reruns and shifts unfinished work forward, never piling more than 130% capacity into any day.
+`roadmap_blocks` فعلی نگه داشته می‌شود (برای زمان‌بندی روزانه)، اما **منبع حقیقت پیشرفت** = `roadmap_nodes`.
 
 ---
 
-## Phase 2 — Deep onboarding interview + exam wizard
+## ۲) موتورها (Pure TS، قابل تست)
 
-### Adaptive interview (`src/pages/LearningProfileWizard.tsx`)
-- Multi-step (10–12 screens), conditional branching (video/book paths), emoji-led answers, progress bar.
-- Captures every field in `learning_profile`. Uses `useLearningProfile` hook (RQ + realtime).
-- Final screen runs `estimationEngine` on a sample topic so the user *sees* the realism.
-
-### Exam wizard (`src/pages/ExamWizard.tsx` + `/exams` list page)
-- Step 1: title, type, date, priority, difficulty, target score.
-- Step 2: pick subjects + add topics (title, pages, video min, difficulty, revisions, practice toggle).
-- Step 3: live preview — engine shows estimated total hours, days needed, suggested daily load, feasibility verdict ("✅ feasible" / "⚠️ tight" / "❌ unrealistic — extend date or cut topics").
-- Saves `exams` + `exam_topics`, then triggers planner regeneration.
+- `src/lib/roadmap/nodeEngine.ts`
+  - `applySessionToNodes(session, nodes, topics)` → کدام نود/ها متاثرند، چقدر progress، آیا completed.
+  - `recomputeUnlocks(nodes)` → باز کردن نودهای جدید بر اساس `unlock_required_*`.
+  - `awardForCompletion(node)` → XP/coin/achievement.
+- `src/lib/roadmap/aiPlanner.ts`
+  - `generateRoadmap(profile, exams, topics, sessionsHistory)` — درخواست به edge function (Lovable AI) برای ساخت کامل نودها/milestoneها/Boss/Review، fallback به planner قطعی موجود (`plannerEngine.ts`).
+- `src/lib/roadmap/skillTree.ts`
+  - برای هر subject، درخت مهارت با `mastery, studyHours, lastReviewed, strength` از داده‌ی واقعی (sessions + topics).
 
 ---
 
-## Phase 3 — Cinematic timeline + smart daily plan UI
+## ۳) Edge Function: `roadmap-ai-planner`
 
-### Timeline (`src/components/roadmap/RoadmapTimeline.tsx`)
-- Horizontal scroll, weeks as columns, exams as vertical milestone pillars with countdown.
-- Phase bands: Foundation → Build → Review → Final Sprint (computed from exam date proximity).
-- Urgency color gradient (green→amber→red) per day based on packed minutes vs capacity.
-- Drag a block to reschedule (writes back to `roadmap_blocks`, triggers re-validate).
-- Framer-motion enter/zoom; tap a day → opens day detail sheet.
-
-### Daily plan (`src/components/roadmap/SmartDailyPlan.tsx`)
-- Replaces the existing simple daily list on Dashboard.
-- Shows ordered blocks with type icon (📖 study, 🔁 review, 📝 test, ☕ buffer), exact start/end, subject, topic, "why this now" reason chip.
-- One-tap: "Start in Timer" / "Mark done" / "Skip → reschedule".
-
-### Insights (`src/components/roadmap/SmartInsightsPanel.tsx`)
-Computed locally from sessions + roadmap:
-- "You're 3.2h behind on Biology this week."
-- "At current pace, Physics finishes 4 days after exam — increase by 25 min/day."
-- "Focus drops after ~`focus_minutes` — 2 of 5 sessions yesterday exceeded this."
-- "Practice-test sessions correlate with +12% productivity for you."
+ورودی: `learning_profile`, `exams`, `exam_topics`, آخرین ۳۰ روز `study_sessions`, `performance_logs`.
+خروجی (tool-calling structured): لیست نودها با parent/child، milestoneها، Boss، Reviewهای فاصله‌دار، due dateها، xpReward.
+نتیجه در `roadmap_nodes` نوشته می‌شود.
 
 ---
 
-## Phase 4 — AI chatbot full awareness
+## ۴) UI
 
-Extend `supabase/functions/study-advisor/index.ts` context with new authoritative blocks the model must quote:
-- **EXAMS** — title, days left, type, priority, % topics completed, projected on-time bool.
-- **TOPICS PENDING** — top 8 by urgency with estimated remaining minutes.
-- **TODAY'S ROADMAP** — exact blocks (type, subject, time, status).
-- **LEARNING PROFILE SUMMARY** — speed/depth/focus/peak window in one line.
-- **ADAPTATION EVENTS (7d)** — which exams were rebalanced and why.
+### `AdventureMap.tsx` (بازسازی)
+- SVG با worldها: island/city/tower/cave/boss arena (هر نود ظاهر مخصوص خود).
+- نودهای locked خاکستری + قفل، available درخشان، completed با تاج/پرچم.
+- کلیک روی نود → `NodeDetailDialog`.
+- وقتی نود کامل می‌شود: pan/zoom دوربین روی نود بعدی + confetti + sound + floating XP.
 
-System-prompt rules added:
-- "What should I study tonight?" → quote TODAY'S ROADMAP blocks for evening window.
-- "Am I on track for X?" → quote EXAMS row for X with projected date.
-- Never invent topics; only reference rows from blocks above.
+### `NodeDetailDialog.tsx` (جدید)
+- ویرایش: title, description, estimatedHours, dueDate, subject/topic, status.
+- اکشن‌ها: حذف، Duplicate، ساخت زیرنود، شروع تایمر برای این نود.
+- پیشرفت زنده، تاریخ آخرین مطالعه، لاگ session‌های متصل.
+- realtime save (`useMutation` + invalidate + supabase realtime channel).
 
-Client `aiContextDispatcher` fires on: exam create/update, topic complete, roadmap regenerate, profile change.
+### `SkillTreeDialog.tsx` (بازسازی)
+- per-subject tab، نود hex با mastery از داده‌ی واقعی، توصیه AI inline.
+
+### `RoadmapHeader`
+- دکمه‌ی **«ساخت نقشه با AI»** → اجرای `roadmap-ai-planner`.
+- دکمه‌ی **«افزودن نود دستی»**.
 
 ---
 
-## Out of scope (this build)
-- LLM-driven roadmap generation (engine is deterministic + fast; AI advises, doesn't plan). Adding LLM planner is an easy follow-up once the deterministic engine is solid.
-- External calendar sync.
-- Mobile push notifications.
-- Mock-exam grading.
+## ۵) اتصال تایمر ↔ نقشه
 
-## Technical notes
-- New files: 2 migrations, `estimationEngine.ts`, `plannerEngine.ts`, `useLearningProfile.ts`, `useExams.ts`, `useRoadmap.ts`, `LearningProfileWizard.tsx`, `ExamWizard.tsx`, `Exams.tsx`, `RoadmapTimeline.tsx`, `SmartDailyPlan.tsx`, `SmartInsightsPanel.tsx`, plus engine unit tests.
-- Edited: `Dashboard.tsx` (swap planner block for `SmartDailyPlan` + add timeline strip), `BottomNav.tsx` (add Roadmap tab), `study-advisor/index.ts`, `App.tsx` (routes), `aiContextDispatcher.ts`.
-- All mutations: optimistic RQ + invalidate + `dispatchAIContextRefresh`.
-- Realtime subscriptions on `exams`, `exam_topics`, `roadmap_blocks`.
+در `useStudySessions` (پایان session):
+1. `applySessionToNodes` صدا زده شود.
+2. نودهای متاثر در DB آپدیت (progress, study_minutes, last_studied_at).
+3. اگر progress=100 → `status=completed`, XP، unlock نودهای بعدی، achievement check، event emit.
+4. `dispatchAIContextRefresh('node_progress')` تا چت AI بداند.
 
-Approve to proceed — I'll start with the Phase 1 migration, then build straight through.
+برای session بدون topic مشخص: نزدیک‌ترین نود `in_progress` همان subject انتخاب می‌شود؛ اگر نبود، اولین `available`.
+
+---
+
+## ۶) Exam → Roadmap خودکار
+
+در `useExams` بعد از ساخت Exam + topics:
+- یک `boss` node برای امتحان + یک `milestone` به ازای هر topic + یک `review` قبل از تاریخ امتحان ساخته می‌شود.
+- وابسته به ترتیب topicها unlockها وصل می‌شوند.
+
+---
+
+## ۷) AI Chat باید نقشه را بفهمد
+
+`buildLiveContext()` گسترش پیدا می‌کند: علاوه بر sessions/tasks، نودهای فعلی (current, next 3, blocked, weakest mastery) به prompt اضافه می‌شوند.
+Edge function `study-advisor` این context را با هر پیام دریافت می‌کند.
+
+---
+
+## ۸) سیستم پاداش
+
+- `awardForCompletion` → XP در `user_xp`, badge در `achievements`, toast + confetti + sound (`/public/sfx/level-up.mp3`).
+- Floating XP component روی نود تکمیل‌شده.
+
+---
+
+## ۹) فایل‌های جدید/تغییریافته
+
+**جدید**
+- `supabase/migrations/<ts>_roadmap_nodes.sql`
+- `supabase/functions/roadmap-ai-planner/index.ts`
+- `src/lib/roadmap/nodeEngine.ts`
+- `src/lib/roadmap/aiPlanner.ts`
+- `src/lib/roadmap/skillTree.ts`
+- `src/hooks/useRoadmapNodes.ts`
+- `src/components/roadmap/NodeDetailDialog.tsx`
+- `src/components/roadmap/RewardOverlay.tsx`
+- `public/sfx/level-up.mp3`, `public/sfx/unlock.mp3`
+
+**بازنویسی**
+- `src/components/roadmap/AdventureMap.tsx`
+- `src/components/roadmap/SkillTreeDialog.tsx`
+- `src/pages/Roadmap.tsx`
+- `src/hooks/useStudySessions.ts` (هوک پایان session)
+- `src/hooks/useExams.ts` (auto-generate nodes)
+- `supabase/functions/study-advisor/index.ts` (context نود)
+
+---
+
+## ۱۰) دامنه‌ی این مرحله
+
+این یک ریفکتور بسیار بزرگ است. برای آنکه چیزی نیمه‌کاره نشود، پیشنهاد می‌کنم در **سه فاز پشت سر هم** ارسال شود — همگی در همین تسک:
+
+- **فاز A:** DB + nodeEngine + `useRoadmapNodes` + اتصال تایمر + auto-generate از Exam (هسته‌ی منطق و داده).
+- **فاز B:** بازنویسی AdventureMap + NodeDetailDialog + RewardOverlay (UI تعاملی + پاداش).
+- **فاز C:** Edge function `roadmap-ai-planner` + بازسازی SkillTree از داده‌ی واقعی + گسترش context چت AI.
+
+با تأیید پلن، از فاز A شروع می‌کنم و تا فاز C جلو می‌روم. اگر می‌خواهی فقط بخشی اجرا شود (مثلاً فقط فاز A) همان را بگو.

@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          code: string
+          description: string | null
+          icon: string
+          id: string
+          title: string
+          unlocked_at: string
+          user_id: string
+          xp_reward: number
+        }
+        Insert: {
+          code: string
+          description?: string | null
+          icon?: string
+          id?: string
+          title: string
+          unlocked_at?: string
+          user_id: string
+          xp_reward?: number
+        }
+        Update: {
+          code?: string
+          description?: string | null
+          icon?: string
+          id?: string
+          title?: string
+          unlocked_at?: string
+          user_id?: string
+          xp_reward?: number
+        }
+        Relationships: []
+      }
       ai_conversations: {
         Row: {
           content: string
@@ -452,6 +485,50 @@ export type Database = {
         }
         Relationships: []
       }
+      node_events: {
+        Row: {
+          created_at: string
+          delta_minutes: number
+          delta_progress: number
+          event_type: string
+          id: string
+          node_id: string
+          payload: Json
+          session_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delta_minutes?: number
+          delta_progress?: number
+          event_type: string
+          id?: string
+          node_id: string
+          payload?: Json
+          session_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          delta_minutes?: number
+          delta_progress?: number
+          event_type?: string
+          id?: string
+          node_id?: string
+          payload?: Json
+          session_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "node_events_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           content: string
@@ -855,6 +932,95 @@ export type Database = {
             columns: ["topic_id"]
             isOneToOne: false
             referencedRelation: "exam_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roadmap_nodes: {
+        Row: {
+          created_at: string
+          description: string | null
+          due_date: string | null
+          estimated_minutes: number
+          exam_id: string | null
+          id: string
+          last_studied_at: string | null
+          order_index: number
+          parent_id: string | null
+          position_x: number
+          position_y: number
+          progress: number
+          status: string
+          study_minutes: number
+          subject_id: string | null
+          title: string
+          topic_id: string | null
+          type: string
+          unlock_required_node_ids: string[]
+          unlock_required_study_minutes: number
+          updated_at: string
+          user_id: string
+          world_kind: string
+          xp_reward: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          estimated_minutes?: number
+          exam_id?: string | null
+          id?: string
+          last_studied_at?: string | null
+          order_index?: number
+          parent_id?: string | null
+          position_x?: number
+          position_y?: number
+          progress?: number
+          status?: string
+          study_minutes?: number
+          subject_id?: string | null
+          title: string
+          topic_id?: string | null
+          type?: string
+          unlock_required_node_ids?: string[]
+          unlock_required_study_minutes?: number
+          updated_at?: string
+          user_id: string
+          world_kind?: string
+          xp_reward?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          estimated_minutes?: number
+          exam_id?: string | null
+          id?: string
+          last_studied_at?: string | null
+          order_index?: number
+          parent_id?: string | null
+          position_x?: number
+          position_y?: number
+          progress?: number
+          status?: string
+          study_minutes?: number
+          subject_id?: string | null
+          title?: string
+          topic_id?: string | null
+          type?: string
+          unlock_required_node_ids?: string[]
+          unlock_required_study_minutes?: number
+          updated_at?: string
+          user_id?: string
+          world_kind?: string
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roadmap_nodes_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_nodes"
             referencedColumns: ["id"]
           },
         ]

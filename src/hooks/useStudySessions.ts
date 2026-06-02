@@ -5,6 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { enqueueStudySession, getQueuedStudySessions, markQueuedStudySessionFailed, removeQueuedStudySession } from "@/lib/sessionQueue";
 import { normalizeStudySession, type StudySessionInput } from "@/lib/studySession";
 import { dispatchAIContextRefresh } from "@/lib/aiContextDispatcher";
+import { applySessionEffect } from "./useRoadmapNodes";
+import { toast } from "sonner";
 
 async function syncQueuedStudySessions(userId: string) {
   const queued = await getQueuedStudySessions(userId);
@@ -150,12 +152,32 @@ export function useSaveSession() {
         return { ...payload, id: normalized.client_session_id, subjects: null, __queued: true };
       }
       await removeQueuedStudySession(normalized.client_session_id);
+      // Apply effect to roadmap nodes (best-effort, non-blocking failure)
+      try {
+        if (data && data.duration_minutes > 0) {
+          const effect = await applySessionEffect(user.id, {
+            id: data.id,
+            subject_id: data.subject_id,
+            duration_minutes: data.duration_minutes,
+            started_at: data.started_at,
+            notes: data.notes,
+          });
+          if (effect.completedNodeIds.length > 0) {
+            toast.success(`🎉 ${effect.completedNodeIds.length} نود کامل شد! +${effect.xpAwarded} XP`);
+          } else if (effect.unlockedNodeIds.length > 0) {
+            toast.message(`✨ ${effect.unlockedNodeIds.length} نود جدید باز شد`);
+          }
+        }
+      } catch (e) {
+        console.warn("[roadmap] applySessionEffect failed", e);
+      }
       return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["study_sessions"] });
       qc.invalidateQueries({ queryKey: ["user_xp"] });
       qc.invalidateQueries({ queryKey: ["weekly_challenges"] });
+      qc.invalidateQueries({ queryKey: ["roadmap_nodes"] });
       dispatchAIContextRefresh("session_saved");
     },
   });
