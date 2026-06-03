@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Settings2 } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 import { useExams, useExamTopics } from "@/hooks/useExams";
 import { useLearningProfile } from "@/hooks/useLearningProfile";
