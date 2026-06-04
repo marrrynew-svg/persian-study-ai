@@ -18,6 +18,11 @@ import { LearningProfileDialog } from "@/components/roadmap/LearningProfileDialo
 import { NodeDetailDialog } from "@/components/roadmap/NodeDetailDialog";
 import { RewardOverlay } from "@/components/roadmap/RewardOverlay";
 import { ExamWizard } from "@/components/roadmap/ExamWizard";
+import { CapacitySetupDialog } from "@/components/planino/CapacitySetupDialog";
+import { BacklogDrawer } from "@/components/planino/BacklogDrawer";
+import { BehaviorInsights } from "@/components/planino/BehaviorInsights";
+import { useGeneratePlan } from "@/hooks/usePlanino";
+import { Wand2 } from "lucide-react";
 
 import { TodayMission } from "@/components/roadmap/command/TodayMission";
 import { WeeklyMissionBoard } from "@/components/roadmap/command/WeeklyMissionBoard";
@@ -36,6 +41,7 @@ export default function Roadmap() {
   const { data: rmNodes = [] } = useRoadmapNodes();
   const generateFromExams = useGenerateNodesFromExams();
   const createNode = useCreateRoadmapNode();
+  const generatePlan = useGeneratePlan();
 
   // Auto-bootstrap nodes for any exam that doesn't have nodes yet
   useEffect(() => {
@@ -151,6 +157,24 @@ export default function Roadmap() {
           dailyTargetMinutes={dailyTargetMinutes}
           onOpenNode={setSelectedNodeId}
         />
+
+        {/* Planino controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            className="gap-1 gradient-primary text-primary-foreground"
+            onClick={() => generatePlan.mutate()}
+            disabled={generatePlan.isPending}
+          >
+            <Wand2 className="w-4 h-4" />
+            {generatePlan.isPending ? "..." : "بازسازی برنامه ۷ روزه"}
+          </Button>
+          <CapacitySetupDialog />
+          <BacklogDrawer />
+        </div>
+
+        {/* Behavior insights */}
+        <BehaviorInsights />
 
         {/* 2) Weekly Mission Board */}
         <WeeklyMissionBoard

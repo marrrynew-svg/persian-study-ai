@@ -80,6 +80,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_logs: {
+        Row: {
+          context: Json
+          created_at: string
+          id: string
+          message: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          context?: Json
+          created_at?: string
+          id?: string
+          message: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          context?: Json
+          created_at?: string
+          id?: string
+          message?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_recommendations: {
         Row: {
           content: Json
@@ -143,6 +170,51 @@ export type Database = {
         }
         Relationships: []
       }
+      backlog_items: {
+        Row: {
+          created_at: string
+          exam_id: string | null
+          id: string
+          priority_score: number
+          remaining_minutes: number
+          source_date: string
+          status: string
+          subject_id: string | null
+          title: string
+          topic_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          exam_id?: string | null
+          id?: string
+          priority_score?: number
+          remaining_minutes?: number
+          source_date?: string
+          status?: string
+          subject_id?: string | null
+          title?: string
+          topic_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          exam_id?: string | null
+          id?: string
+          priority_score?: number
+          remaining_minutes?: number
+          source_date?: string
+          status?: string
+          subject_id?: string | null
+          title?: string
+          topic_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       badges: {
         Row: {
           badge_emoji: string
@@ -170,6 +242,39 @@ export type Database = {
           earned_at?: string
           id?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      behavior_model: {
+        Row: {
+          avg_completion_rate: number
+          burnout_flag: boolean
+          created_at: string
+          id: string
+          overload_streak: number
+          updated_at: string
+          user_id: string
+          weekday_strength: Json
+        }
+        Insert: {
+          avg_completion_rate?: number
+          burnout_flag?: boolean
+          created_at?: string
+          id?: string
+          overload_streak?: number
+          updated_at?: string
+          user_id: string
+          weekday_strength?: Json
+        }
+        Update: {
+          avg_completion_rate?: number
+          burnout_flag?: boolean
+          created_at?: string
+          id?: string
+          overload_streak?: number
+          updated_at?: string
+          user_id?: string
+          weekday_strength?: Json
         }
         Relationships: []
       }
@@ -220,6 +325,39 @@ export type Database = {
           snapshot_date?: string
           study_minutes?: number | null
           subjects_studied?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      daily_plans: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          status: string
+          total_done_minutes: number
+          total_planned_minutes: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          status?: string
+          total_done_minutes?: number
+          total_planned_minutes?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          status?: string
+          total_done_minutes?: number
+          total_planned_minutes?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -1298,6 +1436,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_capacity: {
+        Row: {
+          commute_h: number
+          created_at: string
+          effective_h: number
+          fixed_h: number
+          id: string
+          school_h: number
+          sleep_h: number
+          updated_at: string
+          user_id: string
+          weekday: number
+        }
+        Insert: {
+          commute_h?: number
+          created_at?: string
+          effective_h?: number
+          fixed_h?: number
+          id?: string
+          school_h?: number
+          sleep_h?: number
+          updated_at?: string
+          user_id: string
+          weekday: number
+        }
+        Update: {
+          commute_h?: number
+          created_at?: string
+          effective_h?: number
+          fixed_h?: number
+          id?: string
+          school_h?: number
+          sleep_h?: number
+          updated_at?: string
+          user_id?: string
+          weekday?: number
+        }
+        Relationships: []
       }
       user_xp: {
         Row: {
