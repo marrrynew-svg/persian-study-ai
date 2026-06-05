@@ -1,30 +1,23 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Timer, Map, Brain, User } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { path: "/", icon: Home, label: "خانه" },
-  { path: "/timer", icon: Timer, label: "تایمر" },
-  { path: "/roadmap", icon: Map, label: "نقشه راه" },
-  { path: "/advisor", icon: Brain, label: "مشاور" },
-  { path: "/profile", icon: User, label: "پروفایل" },
-];
+import { SECTIONS, getActiveSection } from "@/lib/navigation";
 
 export function BottomNav() {
   const { pathname } = useLocation();
+  const active = getActiveSection(pathname);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-border/50">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-1">
-        {navItems.map(({ path, icon: Icon, label }) => {
-          const isActive = pathname === path;
+        {SECTIONS.map(({ key, path, icon: Icon, label }) => {
+          const isActive = active.key === key;
           return (
             <Link
-              key={path}
+              key={key}
               to={path}
               className={cn(
-                "flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-colors relative",
+                "flex flex-col items-center gap-0.5 py-1 px-1.5 rounded-xl transition-colors relative flex-1 min-w-0",
                 isActive ? "text-primary" : "text-muted-foreground"
               )}
             >
@@ -35,8 +28,8 @@ export function BottomNav() {
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
               )}
-              <Icon className="w-5 h-5" />
-              <span className="text-[9px] font-medium">{label}</span>
+              <Icon className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-medium truncate w-full text-center">{label}</span>
             </Link>
           );
         })}
