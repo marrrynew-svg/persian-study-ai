@@ -21,6 +21,27 @@ import NotesPage from "./pages/Notes";
 import Roadmap from "./pages/Roadmap";
 import Exams from "./pages/Exams";
 import NotFound from "./pages/NotFound";
+// Placeholder pages for newly added sub-routes
+import Reviews from "./pages/placeholders/Reviews";
+import CalendarPage from "./pages/placeholders/Calendar";
+import Timeline from "./pages/placeholders/Timeline";
+import Flashcards from "./pages/placeholders/Flashcards";
+import ActiveRecall from "./pages/placeholders/ActiveRecall";
+import Scanner from "./pages/placeholders/Scanner";
+import Sessions from "./pages/placeholders/Sessions";
+import SkillTree from "./pages/placeholders/SkillTree";
+import Milestones from "./pages/placeholders/Milestones";
+import Achievements from "./pages/placeholders/Achievements";
+import Dreams from "./pages/placeholders/Dreams";
+import Letters from "./pages/placeholders/Letters";
+import Settings from "./pages/placeholders/Settings";
+import CoachToday from "./pages/placeholders/CoachToday";
+import CoachWeek from "./pages/placeholders/CoachWeek";
+import CoachSuggest from "./pages/placeholders/CoachSuggest";
+import CoachWeak from "./pages/placeholders/CoachWeak";
+import CoachTomorrow from "./pages/placeholders/CoachTomorrow";
+import CoachQuickReview from "./pages/placeholders/CoachQuickReview";
+import CoachFeynman from "./pages/placeholders/CoachFeynman";
 import { useStudySessionQueueSync } from "@/hooks/useStudySessions";
 import { useEffect } from "react";
 import { forceAIContextRefresh } from "@/lib/aiContextDispatcher";
@@ -79,6 +100,44 @@ function AppRoutes() {
       <Route path="/notes" element={<ProtectedRoute><NotesPage /></ProtectedRoute>} />
       <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
       <Route path="/exams" element={<ProtectedRoute><Exams /></ProtectedRoute>} />
+
+      {/* Section hubs — redirect to first sub-route */}
+      <Route path="/plan" element={<Navigate to="/planner" replace />} />
+      <Route path="/study" element={<Navigate to="/timer" replace />} />
+      <Route path="/coach" element={<Navigate to="/advisor" replace />} />
+      <Route path="/journey" element={<Navigate to="/roadmap" replace />} />
+      <Route path="/me" element={<Navigate to="/profile" replace />} />
+
+      {/* Plan section */}
+      <Route path="/reviews" element={<ProtectedRoute><Reviews /></ProtectedRoute>} />
+      <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
+      <Route path="/timeline" element={<ProtectedRoute><Timeline /></ProtectedRoute>} />
+
+      {/* Study section */}
+      <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
+      <Route path="/active-recall" element={<ProtectedRoute><ActiveRecall /></ProtectedRoute>} />
+      <Route path="/scanner" element={<ProtectedRoute><Scanner /></ProtectedRoute>} />
+      <Route path="/sessions" element={<ProtectedRoute><Sessions /></ProtectedRoute>} />
+
+      {/* Journey section */}
+      <Route path="/skill-tree" element={<ProtectedRoute><SkillTree /></ProtectedRoute>} />
+      <Route path="/milestones" element={<ProtectedRoute><Milestones /></ProtectedRoute>} />
+      <Route path="/achievements" element={<ProtectedRoute><Achievements /></ProtectedRoute>} />
+
+      {/* Me section */}
+      <Route path="/dreams" element={<ProtectedRoute><Dreams /></ProtectedRoute>} />
+      <Route path="/letters" element={<ProtectedRoute><Letters /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+
+      {/* Coach section */}
+      <Route path="/coach/today" element={<ProtectedRoute><CoachToday /></ProtectedRoute>} />
+      <Route path="/coach/week" element={<ProtectedRoute><CoachWeek /></ProtectedRoute>} />
+      <Route path="/coach/suggest" element={<ProtectedRoute><CoachSuggest /></ProtectedRoute>} />
+      <Route path="/coach/weak" element={<ProtectedRoute><CoachWeak /></ProtectedRoute>} />
+      <Route path="/coach/tomorrow" element={<ProtectedRoute><CoachTomorrow /></ProtectedRoute>} />
+      <Route path="/coach/quick-review" element={<ProtectedRoute><CoachQuickReview /></ProtectedRoute>} />
+      <Route path="/coach/feynman" element={<ProtectedRoute><CoachFeynman /></ProtectedRoute>} />
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
