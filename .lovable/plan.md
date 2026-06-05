@@ -1,50 +1,72 @@
-# Planino — موتور برنامه‌ریزی تطبیقی
+## Planona Full Rebuild — Phased Plan
 
-سیستم را در ۴ لایه می‌سازیم: Data → Planning → Replanning → AI Coach. روی دیتابیس و کدِ موجود (`exams`, `exam_topics`, `study_sessions`, `roadmap_blocks/nodes`, `learning_profile`, `subjects`) سوار می‌شود؛ چیزی دوباره‌کاری نمی‌شود.
+این یک بازسازی بسیار بزرگ است. اگر همه فازها را یکجا اجرا کنیم، ریسک شکست بالاست و نمی‌توان آن را در یک پاسخ تحویل داد. پیشنهاد می‌کنم به فازهای قابل تحویل تقسیم شود و در هر فاز، نتیجه قابل تست باشد.
 
-## فاز ۱ — Data Layer (Migration)
-جدول‌های جدید (RLS + GRANT کامل):
-- `user_capacity` — ظرفیت واقعی هر روز هفته: `weekday, sleep_h, school_h, commute_h, fixed_h, effective_h`.
-- `backlog_items` — `user_id, subject_id, topic_id, exam_id, remaining_minutes, source_date, priority_score`.
-- `daily_plans` — `date, total_planned_minutes, total_done_minutes, status (pending|completed|partial|skipped)`.
-- `behavior_model` — per-user: `weekday_strength jsonb` (0..1 per روز)، `avg_completion_rate`, `burnout_flag`, `updated_at`.
-- `ai_logs` — `user_id, type (analysis|advice|motivation), message, context jsonb`.
-از `roadmap_blocks` به‌عنوان «task روزانه» استفاده می‌کنیم؛ فیلد `status` و `duration_minutes` و `topic_id` کافی است.
+### Phase 0 — Audit (این پاسخ)
+- اسکن کامل `src/pages`, `src/components`, `src/hooks`, `src/lib`, `src/store`
+- ساخت فایل `docs/AUDIT.md` شامل:
+  - فهرست همه صفحات + Route ها
+  - فهرست همه Feature ها (موجود / ناقص / Disconnected)
+  - فهرست همه Hook ها و Store action ها
+  - فهرست AI features
+  - نقشه Data Flow بین Session / XP / Streak / Skill Tree / Reports / AI Context
+- خروجی: گزارش Audit، بدون تغییر کد
 
-## فاز ۲ — Planning Engine (`src/lib/planino/`)
-- `capacity.ts` — `effectiveHoursFor(date, profile, capacityRows, fixedEvents)`.
-- `priority.ts` — `score(task) = 0.40*deadline + 0.25*weakness + 0.20*examImportance + 0.10*size + 0.05*history` با وزن‌های دقیقاً مطابق اسپک.
-- `taskCollector.ts` — از `exam_topics` ناتمام + `tasks` با due + topics ضعیف (`subject.strength_level<60`) + spaced reviews + `backlog_items` لیست تسک می‌سازد.
-- `dailyPlanner.ts` — sort by priority، پر کردن ظرفیت روز، split اگر زمان کم بود، overflow → `backlog_items`.
-- `weeklyPlanner.ts` — همان روی ۷ روز با weekday_strength.
-خروجی → `roadmap_blocks` (نه یک جدول جدید جداگانه).
+### Phase 1 — Information Architecture
+- بازسازی Navigation بر اساس ۶ بخش: خانه / برنامه / مطالعه / مربی AI / سفر / من
+- ساخت route shell ها: `/home`, `/plan`, `/study`, `/coach`, `/journey`, `/me` با تب‌های زیرمجموعه
+- انتقال صفحات موجود به محل صحیح (بدون حذف)
+- بازنویسی Bottom Nav / Sidebar
 
-## فاز ۳ — Replanning Engine
-- `src/lib/planino/replanner.ts` — شبانه از `daily_plans` + `study_sessions` واقعی diff می‌گیرد، backlog را در ۳..۷ روز آینده پخش می‌کند **بدون overload** (قانون طلایی: never punitive).
-- `behaviorModel.ts` — به‌روزرسانی `weekday_strength`, `avg_completion_rate`.
-- `burnout.ts` — اگر ۳ روز پشت سر هم `planned > 1.2×capacity` → flag + کاهش خودکار حجم فردا + تبدیل تسک‌ها به مرور سبک.
-- Edge function `planino-nightly-replan` (cron روزانه ساعت ۲۳:۵۹) همه‌ی این‌ها را اجرا می‌کند.
+### Phase 2 — Home Dashboard
+- خالی‌سازی Home از قابلیت‌های سنگین
+- فقط ویجت‌های: Greeting, Daily Briefing, Today Progress, XP, Streak, Countdown, Today Tasks, Quick Start, Weak Subject Alert, Quick Mode, Roadmap Summary, Next Best Action
 
-## فاز ۴ — AI Coach Layer (تحلیل، نه تصمیم)
-- Edge function `planino-coach` با Lovable AI (`google/gemini-3-flash-preview`) فقط متن تحلیل/توضیح/انگیزه تولید می‌کند و در `ai_logs` می‌نویسد.
-- ورودی: snapshot هفته‌ی گذشته (completion%، weak days، backlog size، burnout flag). خروجی: ۱..۳ پیام کوتاه فارسی.
-- در `study-advisor` موجود، context جدید (capacity، backlog، behavior) اضافه می‌شود تا چت هم بفهمد.
+### Phase 3 — Plan Center
+- تب‌ها: هفتگی / آزمون‌ها / مرورها / تقویم / Timeline
+- اتصال به Planino engine موجود
 
-## فاز ۵ — UI (در صفحه‌ی Roadmap موجود)
-- `CapacitySetupDialog` — کاربر یک بار ظرفیت روزهای هفته (خواب/مدرسه/رفت‌وآمد/کلاس ثابت) را پر می‌کند.
-- `BacklogDrawer` — نمایش backlog فعلی، چقدر روی روزهای آینده پخش شده.
-- `BehaviorInsights` — کارت کوچک با weekday strength + burnout warning + پیام AI Coach.
-- دکمه‌ی «بازسازی برنامه» → فراخوانی replanner.
+### Phase 4 — Study Center
+- تب‌ها: تایمر / فلش‌کارت / مرور فعال / اسکنر / جلسات
 
-## فایل‌های جدید/تغییریافته
-- Migration: `user_capacity`, `backlog_items`, `daily_plans`, `behavior_model`, `ai_logs`.
-- جدید: `src/lib/planino/{capacity,priority,taskCollector,dailyPlanner,weeklyPlanner,replanner,behaviorModel,burnout}.ts`, `src/hooks/usePlanino.ts`, `src/components/planino/{CapacitySetupDialog,BacklogDrawer,BehaviorInsights}.tsx`, `supabase/functions/planino-nightly-replan/index.ts`, `supabase/functions/planino-coach/index.ts`.
-- ویرایش: `src/pages/Roadmap.tsx`, `supabase/functions/study-advisor/index.ts`, `src/hooks/useStudySessions.ts` (پایان session → daily_plans update + push to backlog if shortfall).
+### Phase 5 — AI Coach
+- بازطراحی AI به ۸ زیر صفحه (Chat, تحلیل امروز، تحلیل هفته، …)
+- ساخت یک `aiContext` builder در `src/lib/ai/context.ts` که داده واقعی (sessions, tasks, notes, exams, roadmap, xp, streak, flashcards) را به Edge Function می‌فرستد
+- Edge function `ai-coach` با system prompt های تخصصی هر mode
 
-## دامنه
-این یک پروژه‌ی بزرگ است. پیشنهاد فازبندی پشت سر هم در همین تسک:
-- **A:** Migration + Capacity + Priority + dailyPlanner + UI ظرفیت.
-- **B:** Backlog + Replanner + nightly cron + UI backlog.
-- **C:** Behavior model + Burnout + AI Coach + اتصال به چت.
+### Phase 6 — Smart Planning Engine v2
+- توسعه `src/lib/planino/*` موجود
+- ورودی‌های جدید (نوع آزمون، صفحات، تست، ویدیو، سختی، سرعت، روزهای آزاد/محدود)
+- خروجی: برنامه روزانه/هفتگی/جبرانی/مرور + replanner خودکار
 
-با تأیید پلن از فاز A شروع می‌کنم. اگر فقط بخشی را می‌خواهی بگو.
+### Phase 7 — Journey & Me
+- Journey: Roadmap / Skill Tree / Milestones / Achievements
+- Me: Profile / Reports / Dream Board / Future Letters / Notes / Settings
+
+### Phase 8 — Data Flow Validation
+- ایجاد یک `eventBus` مرکزی: پایان Session → save + XP + Streak + Skill Tree + Reports + AI Context
+- حذف Data Island ها
+
+### Phase 9 — UI/UX Polish
+- Spacing، Typography، Component variants
+- تست همه روت‌ها
+
+### Phase 10 — QA
+- چک همه روت‌ها در preview
+- رفع Blank Page / Runtime Error / Dead Button
+
+---
+
+## سوال مهم قبل از شروع
+
+این کار حداقل ۸-۱۲ نوبت پیام جداگانه نیاز دارد. برای شروع کدام مسیر را ترجیح می‌دهی؟
+
+**A) شروع از Phase 0 (Audit)** — اول گزارش کامل از وضع فعلی، بعد بر اساس آن تصمیم بگیریم چه چیزی واقعاً نیاز به بازسازی دارد. (پیشنهاد من)
+
+**B) شروع از Phase 1 (IA + Navigation)** — مستقیم ساختار ۶ بخشی را پیاده کنیم، صفحات موجود را جابجا کنیم.
+
+**C) شروع از Phase 5 (AI Coach)** — اول مغز AI را به داده واقعی وصل کنیم چون بیشترین ارزش را دارد.
+
+**D) شروع از Phase 6 (Smart Planning Engine v2)** — اول موتور برنامه‌ریزی را کامل کنیم.
+
+لطفاً یکی را انتخاب کن یا ترتیب دلخواه خودت را بگو.
