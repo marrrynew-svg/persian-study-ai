@@ -25,7 +25,7 @@ export function useNotes() {
   useEffect(() => {
     if (!user) return;
     const ch = supabase
-      .channel(`notes-${user.id}`)
+      .channel(`notes-${user.id}-${Math.random().toString(36).slice(2, 8)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "notes", filter: `user_id=eq.${user.id}` }, () => {
         qc.invalidateQueries({ queryKey: ["notes"] });
       })

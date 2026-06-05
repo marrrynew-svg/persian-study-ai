@@ -23,7 +23,7 @@ export function useCapacity() {
   useEffect(() => {
     if (!user) return;
     const ch = sb
-      .channel(`capacity-${user.id}`)
+      .channel(`capacity-${user.id}-${Math.random().toString(36).slice(2, 8)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "user_capacity", filter: `user_id=eq.${user.id}` },
         () => qc.invalidateQueries({ queryKey: ["planino_capacity"] }))
       .subscribe();
