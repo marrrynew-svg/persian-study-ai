@@ -38,7 +38,7 @@ export function useStudySessions(days = 7) {
       qc.invalidateQueries({ queryKey: ["user_xp"] });
     };
     const channel = supabase
-      .channel(`study-sessions-${user.id}`)
+      .channel(`study-sessions-${user.id}-${Math.random().toString(36).slice(2, 8)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "study_sessions", filter: `user_id=eq.${user.id}` }, refresh)
       .subscribe();
     window.addEventListener("online", refresh);
