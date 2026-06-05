@@ -32,7 +32,7 @@ export function useRoadmapBlocks(daysAhead = 30) {
   useEffect(() => {
     if (!user) return;
     const ch = supabase
-      .channel(`roadmap-${user.id}`)
+      .channel(`roadmap-${user.id}-${Math.random().toString(36).slice(2, 8)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "roadmap_blocks", filter: `user_id=eq.${user.id}` }, () => {
         qc.invalidateQueries({ queryKey: ["roadmap_blocks"] });
       })

@@ -11,7 +11,7 @@ export function useTasks() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel(`tasks-${user.id}`)
+      .channel(`tasks-${user.id}-${Math.random().toString(36).slice(2, 8)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` }, () => {
         qc.invalidateQueries({ queryKey: ["tasks"] });
       })
