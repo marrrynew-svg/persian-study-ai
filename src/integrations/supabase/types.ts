@@ -742,6 +742,205 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_analysis: {
+        Row: {
+          created_at: string
+          days_left: number
+          exam_setup_id: string | null
+          id: string
+          pressure_score: number
+          reasoning: Json
+          risk_level: string
+          total_available_minutes: number
+          total_required_minutes: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          days_left?: number
+          exam_setup_id?: string | null
+          id?: string
+          pressure_score?: number
+          reasoning?: Json
+          risk_level?: string
+          total_available_minutes?: number
+          total_required_minutes?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          days_left?: number
+          exam_setup_id?: string | null
+          id?: string
+          pressure_score?: number
+          reasoning?: Json
+          risk_level?: string
+          total_available_minutes?: number
+          total_required_minutes?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_analysis_exam_setup_id_fkey"
+            columns: ["exam_setup_id"]
+            isOneToOne: false
+            referencedRelation: "plan_exam_setup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_block_v2: {
+        Row: {
+          block_order: number
+          created_at: string
+          daily_id: string
+          done_minutes: number
+          id: string
+          pages: number
+          recovery_minutes: number
+          review_minutes: number
+          status: string
+          study_minutes: number
+          subject_input_id: string | null
+          subject_name: string
+          tests: number
+          topic: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          block_order?: number
+          created_at?: string
+          daily_id: string
+          done_minutes?: number
+          id?: string
+          pages?: number
+          recovery_minutes?: number
+          review_minutes?: number
+          status?: string
+          study_minutes?: number
+          subject_input_id?: string | null
+          subject_name: string
+          tests?: number
+          topic?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          block_order?: number
+          created_at?: string
+          daily_id?: string
+          done_minutes?: number
+          id?: string
+          pages?: number
+          recovery_minutes?: number
+          review_minutes?: number
+          status?: string
+          study_minutes?: number
+          subject_input_id?: string | null
+          subject_name?: string
+          tests?: number
+          topic?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_block_v2_daily_id_fkey"
+            columns: ["daily_id"]
+            isOneToOne: false
+            referencedRelation: "plan_daily_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_block_v2_subject_input_id_fkey"
+            columns: ["subject_input_id"]
+            isOneToOne: false
+            referencedRelation: "plan_subject_inputs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_daily_v2: {
+        Row: {
+          created_at: string
+          date: string
+          exam_setup_id: string | null
+          id: string
+          status: string
+          total_done_minutes: number
+          total_planned_minutes: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          exam_setup_id?: string | null
+          id?: string
+          status?: string
+          total_done_minutes?: number
+          total_planned_minutes?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          exam_setup_id?: string | null
+          id?: string
+          status?: string
+          total_done_minutes?: number
+          total_planned_minutes?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_daily_v2_exam_setup_id_fkey"
+            columns: ["exam_setup_id"]
+            isOneToOne: false
+            referencedRelation: "plan_exam_setup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_exam_setup: {
+        Row: {
+          created_at: string
+          exam_date: string
+          exam_name: string
+          exam_time: string | null
+          exam_type: string
+          id: string
+          is_active: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          exam_date: string
+          exam_name: string
+          exam_time?: string | null
+          exam_type?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          exam_date?: string
+          exam_name?: string
+          exam_time?: string | null
+          exam_type?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       plan_items: {
         Row: {
           duration_minutes: number | null
@@ -795,6 +994,194 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      plan_replan_log: {
+        Row: {
+          created_at: string
+          deferred_minutes: number
+          done_minutes: number
+          for_date: string
+          id: string
+          missed_minutes: number
+          summary: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deferred_minutes?: number
+          done_minutes?: number
+          for_date: string
+          id?: string
+          missed_minutes?: number
+          summary?: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deferred_minutes?: number
+          done_minutes?: number
+          for_date?: string
+          id?: string
+          missed_minutes?: number
+          summary?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
+      plan_study_style: {
+        Row: {
+          created_at: string
+          daily_hours_available: number
+          focus_minutes: number
+          has_school: boolean
+          has_university: boolean
+          has_work: boolean
+          id: string
+          learning_mode: string
+          reading_speed: string
+          real_focus_hours: number
+          review_count_per_week: number
+          sleep_time: string
+          test_days_per_week: number
+          updated_at: string
+          user_id: string
+          wake_time: string
+          weekend_free: boolean
+        }
+        Insert: {
+          created_at?: string
+          daily_hours_available?: number
+          focus_minutes?: number
+          has_school?: boolean
+          has_university?: boolean
+          has_work?: boolean
+          id?: string
+          learning_mode?: string
+          reading_speed?: string
+          real_focus_hours?: number
+          review_count_per_week?: number
+          sleep_time?: string
+          test_days_per_week?: number
+          updated_at?: string
+          user_id: string
+          wake_time?: string
+          weekend_free?: boolean
+        }
+        Update: {
+          created_at?: string
+          daily_hours_available?: number
+          focus_minutes?: number
+          has_school?: boolean
+          has_university?: boolean
+          has_work?: boolean
+          id?: string
+          learning_mode?: string
+          reading_speed?: string
+          real_focus_hours?: number
+          review_count_per_week?: number
+          sleep_time?: string
+          test_days_per_week?: number
+          updated_at?: string
+          user_id?: string
+          wake_time?: string
+          weekend_free?: boolean
+        }
+        Relationships: []
+      }
+      plan_subject_inputs: {
+        Row: {
+          chapters_total: number
+          coefficient: number
+          created_at: string
+          current_level: string
+          exam_setup_id: string
+          id: string
+          importance: number
+          notes_left: number
+          order_index: number
+          pages_left: number
+          subject_name: string
+          target_percent: number
+          tests_left: number
+          updated_at: string
+          user_id: string
+          video_minutes_left: number
+        }
+        Insert: {
+          chapters_total?: number
+          coefficient?: number
+          created_at?: string
+          current_level?: string
+          exam_setup_id: string
+          id?: string
+          importance?: number
+          notes_left?: number
+          order_index?: number
+          pages_left?: number
+          subject_name: string
+          target_percent?: number
+          tests_left?: number
+          updated_at?: string
+          user_id: string
+          video_minutes_left?: number
+        }
+        Update: {
+          chapters_total?: number
+          coefficient?: number
+          created_at?: string
+          current_level?: string
+          exam_setup_id?: string
+          id?: string
+          importance?: number
+          notes_left?: number
+          order_index?: number
+          pages_left?: number
+          subject_name?: string
+          target_percent?: number
+          tests_left?: number
+          updated_at?: string
+          user_id?: string
+          video_minutes_left?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_subject_inputs_exam_setup_id_fkey"
+            columns: ["exam_setup_id"]
+            isOneToOne: false
+            referencedRelation: "plan_exam_setup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_wizard_state: {
+        Row: {
+          answers: Json
+          completed: boolean
+          created_at: string
+          current_step: number
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          answers?: Json
+          completed?: boolean
+          created_at?: string
+          current_step?: number
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          answers?: Json
+          completed?: boolean
+          created_at?: string
+          current_step?: number
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       plans: {
         Row: {
