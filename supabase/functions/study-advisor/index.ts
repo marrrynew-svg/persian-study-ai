@@ -768,6 +768,15 @@ serve(async (req) => {
       supabaseAdmin.from("roadmap_blocks").select("*").eq("user_id", userId).gte("date", new Date().toISOString().split("T")[0]).lte("date", new Date(Date.now()+7*86400000).toISOString().split("T")[0]).order("date").order("start_time"),
       supabaseAdmin.from("learning_profile").select("*").eq("user_id", userId).maybeSingle(),
     ] as any);
+    // Smart Plan v2 context
+    const [planExamRes, planAnalysisRes, planDailyRes] = await Promise.all([
+      supabaseAdmin.from("plan_exam_setup").select("*").eq("user_id", userId).eq("is_active", true).order("created_at",{ascending:false}).limit(1).maybeSingle(),
+      supabaseAdmin.from("plan_analysis").select("*").eq("user_id", userId).order("created_at",{ascending:false}).limit(1).maybeSingle(),
+      supabaseAdmin.from("plan_daily_v2").select("*, plan_block_v2(*)").eq("user_id", userId).gte("date", new Date().toISOString().split("T")[0]).lte("date", new Date(Date.now()+7*86400000).toISOString().split("T")[0]).order("date"),
+    ] as any);
+    const planExam = (planExamRes as any)?.data;
+    const planAnalysis = (planAnalysisRes as any)?.data;
+    const planDays = (planDailyRes as any)?.data || [];
     const examsData = (examsRes as any)?.data || [];
     const topicsData = (topicsRes as any)?.data || [];
     const blocksData = (blocksRes as any)?.data || [];
@@ -845,6 +854,39 @@ ${todayRoadmap}
 ${lpLine}
 ═══════════════════════════════════════`;
 
+    // Smart Plan v2 block
+    let smartPlanBlock = "\n═══════════════════════════════════════\n🧠 مشاور هوشمند (Smart Plan v2):\n═══════════════════════════════════════\n";
+    if (planExam && planAnalysis) {
+      const r = planAnalysis as any;
+      const riskLabel: Record<string,string> = { green:"🟢 سبز", yellow:"🟡 زرد", orange:"🟠 نارنجی", red:"🔴 قرمز" };
+      smartPlanBlock += `آزمون فعال: ${planExam.exam_name} (${planExam.exam_type}) — ${planExam.exam_date}\n`;
+      smartPlanBlock += `وضعیت: ${riskLabel[r.risk_level] || r.risk_level} (فشار ${r.pressure_score})\n`;
+      smartPlanBlock += `روز باقی‌مانده: ${r.days_left} · کل نیاز: ${Math.round(r.total_required_minutes/60)}h · کل ظرفیت: ${Math.round(r.total_available_minutes/60)}h\n`;
+      const today = new Date().toISOString().split("T")[0];
+      const tdy = planDays.find((d: any) => d.date === today);
+      if (tdy) {
+        const blocks = (tdy.plan_block_v2 || []).sort((a:any,b:any)=>a.block_order-b.block_order);
+        smartPlanBlock += `\nبرنامه امروز (${blocks.length} بلوک · ${tdy.total_planned_minutes}m):\n`;
+        for (const b of blocks) {
+          const st = b.status === "done" ? "✅" : b.status === "skipped" ? "⏭️" : b.status === "postponed" ? "⏸️" : "•";
+          smartPlanBlock += `  ${st} ${b.subject_name} — ${b.study_minutes}m مطالعه`;
+          if (b.pages) smartPlanBlock += ` · ${b.pages}ص`;
+          if (b.tests) smartPlanBlock += ` · ${b.tests}تست`;
+          if (b.review_minutes) smartPlanBlock += ` · ${b.review_minutes}m مرور`;
+          smartPlanBlock += `\n`;
+        }
+      } else {
+        smartPlanBlock += "\n⚠️ امروز بلوکی در برنامه هوشمند نیست — توصیه کن کاربر بازسازی برنامه را اجرا کند.\n";
+      }
+      const reasoning = (r.reasoning as any)?.reasoning;
+      if (Array.isArray(reasoning)) {
+        smartPlanBlock += "\nاستدلال موتور:\n" + reasoning.map((x:string) => `  · ${x}`).join("\n") + "\n";
+      }
+    } else {
+      smartPlanBlock += "کاربر هنوز برنامه هوشمند نساخته. اگر سوال درباره برنامه پرسید، پیشنهاد بده /plan/wizard را تکمیل کند.\n";
+    }
+    smartPlanBlock += "═══════════════════════════════════════";
+
     const emotionalState = detectEmotionalState(message);
     const systemPrompt = buildSystemPrompt(mode, burnoutRisk, daysLeft, emotionalState);
 
@@ -867,7 +909,7 @@ ${lpLine}
 
     const messages = [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `${fullContext}\n${roadmapContext}\n\n🎭 وضعیت عاطفی تشخیص‌داده‌شده: ${emotionalState}` },
+      { role: "user", content: `${fullContext}\n${roadmapContext}\n${smartPlanBlock}\n\n🎭 وضعیت عاطفی تشخیص‌داده‌شده: ${emotionalState}` },
       ...conversationHistory,
       { role: "user", content: message },
     ];
