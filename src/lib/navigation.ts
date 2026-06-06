@@ -38,7 +38,10 @@ export const SECTIONS: Section[] = [
     label: "برنامه",
     icon: Calendar,
     subs: [
-      { path: "/planner", label: "هفتگی", icon: CalendarRange },
+      { path: "/plan/today", label: "امروز", icon: CalendarDays },
+      { path: "/plan/week", label: "هفته", icon: CalendarRange },
+      { path: "/plan/wizard", label: "مشاور", icon: Sparkles },
+      { path: "/planner", label: "کلاسیک", icon: CalendarRange },
       { path: "/exams", label: "آزمون‌ها", icon: GraduationCap },
       { path: "/tasks", label: "تسک‌ها", icon: ListChecks },
       { path: "/reviews", label: "مرورها", icon: Repeat },

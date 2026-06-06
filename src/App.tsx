@@ -42,6 +42,9 @@ import CoachWeak from "./pages/placeholders/CoachWeak";
 import CoachTomorrow from "./pages/placeholders/CoachTomorrow";
 import CoachQuickReview from "./pages/placeholders/CoachQuickReview";
 import CoachFeynman from "./pages/placeholders/CoachFeynman";
+import SmartWizard from "./pages/plan/SmartWizard";
+import SmartToday from "./pages/plan/SmartToday";
+import SmartWeek from "./pages/plan/SmartWeek";
 import { useStudySessionQueueSync } from "@/hooks/useStudySessions";
 import { useEffect } from "react";
 import { forceAIContextRefresh } from "@/lib/aiContextDispatcher";
@@ -102,11 +105,16 @@ function AppRoutes() {
       <Route path="/exams" element={<ProtectedRoute><Exams /></ProtectedRoute>} />
 
       {/* Section hubs — redirect to first sub-route */}
-      <Route path="/plan" element={<Navigate to="/planner" replace />} />
+      <Route path="/plan" element={<Navigate to="/plan/today" replace />} />
       <Route path="/study" element={<Navigate to="/timer" replace />} />
       <Route path="/coach" element={<Navigate to="/advisor" replace />} />
       <Route path="/journey" element={<Navigate to="/roadmap" replace />} />
       <Route path="/me" element={<Navigate to="/profile" replace />} />
+
+      {/* Smart Planning v2 */}
+      <Route path="/plan/wizard" element={<ProtectedRoute><SmartWizard /></ProtectedRoute>} />
+      <Route path="/plan/today" element={<ProtectedRoute><SmartToday /></ProtectedRoute>} />
+      <Route path="/plan/week" element={<ProtectedRoute><SmartWeek /></ProtectedRoute>} />
 
       {/* Plan section */}
       <Route path="/reviews" element={<ProtectedRoute><Reviews /></ProtectedRoute>} />
