@@ -34,6 +34,7 @@ import { InteractiveCalendar } from "@/components/dashboard/InteractiveCalendar"
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { QuickNotes } from "@/components/dashboard/QuickNotes";
 import { TodayTasks } from "@/components/dashboard/TodayTasks";
+import { SmartPlanWidget } from "@/components/dashboard/SmartPlanWidget";
 
 export default function Dashboard() {
   const { data: profile, isLoading: profileLoading } = useProfile();
@@ -197,6 +198,11 @@ export default function Dashboard() {
         {/* Quick actions */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.29 }}>
           <QuickActions />
+        </motion.div>
+
+        {/* Smart Plan v2 */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.295 }}>
+          <SmartPlanWidget />
         </motion.div>
 
         {/* Today's tasks */}
