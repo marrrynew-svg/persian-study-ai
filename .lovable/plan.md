@@ -1,123 +1,73 @@
 
-# Smart Planning System v2 — "AI Study Advisor"
+# Planino v3 — Elite Study Planning System
 
-Scope is locked to the planning system only. No other module (Dashboard layout, Tasks page, Roadmap engine, AI chat UI, gamification, social) will be redesigned — only **connected** to the new plan output.
+سیستم فعلی بلوک‌ها را «تخت» تولید می‌کند: بدون ساعت، بدون فاصله‌گذاری تکرار، بدون منطق ماهانه، بدون توضیح AI. بازسازی end-to-end در چهار لایه:
 
----
+## 1) موتور برنامه‌ریزی (Planino v3 core)
 
-## 1. Database (new tables, additive only)
+فایل‌های جدید در `src/lib/planino/v3/`:
 
-````text
-plan_wizard_state         current/last wizard answers (resume support)
-plan_exam_setup           exam-level inputs (name, type, date, time)
-plan_subject_inputs       per-subject volume: chapters, pages_left, tests_left,
-                          notes_left, video_minutes_left, level, importance,
-                          coefficient, target_percent
-plan_study_style          daily hours, real focus hours, wake/sleep,
-                          school/uni/work, weekend free, reading speed,
-                          learning mode, focus minutes, test days/wk, reviews/wk
-plan_analysis             computed: total_volume, required_minutes, days_left,
-                          available_minutes, pressure_score, risk_level
-                          (green|yellow|orange|red), reasoning jsonb
-plan_daily_v2             per-day plan with rich blocks
-plan_block_v2             subject, topic, pages, tests, study_min, review_min,
-                          recovery_min, status
-plan_weekly_goal          per-week per-subject budget + target progress %
-plan_replan_log           nightly diff: done/missed/deferred, new plan id
-````
+- `types.ts` — تایپ‌های جدید: `TimeSlot`, `DailyPlan`, `WeeklyPlan`, `MonthlyPlan`, `SpacedItem`, `PlanRationale`
+- `timeSlotEngine.ts` — بلوک زمان‌بندی ساعتی: از `wake_time` تا `sleep_time`، حذف بازهٔ مدرسه/دانشگاه/کار، درج بلوک تمرکز ۹۰′ + استراحت ۱۵′ (روش پومودورو بلند)، بلوک ورزش ۳۰′، ۲ بازهٔ تست‌زنی هفتگی
+- `spacedRepetition.ts` — الگوریتم SM-2 ساده: هر مبحثی که مطالعه شد در روز +1/+3/+7/+16 دوبار مرور می‌شود (بلوک `review`)
+- `dailyPlanner.ts` — روزانه: اولویت‌بندی موضوعات با `priorityRanker` + تزریق مرورها + بلوک تست + ۱ بلوک تمرکز عمیق صبحگاهی
+- `weeklyPlanner.ts` — هفتگی: توزیع پوشش دروس بر ۷ روز با قانون تنوع (هیچ درسی ۳ روز پشت هم غالب نباشد)، ۱ روز آزمون شبیه‌ساز، ۱ روز جبرانی نیمه‌سبک
+- `monthlyPlanner.ts` — ماهانه: تقسیم روزهای مانده به سه فاز (`foundation` 50%, `mastery` 30%, `simulation` 20%)، تعیین Milestoneهای هفتگی، هیت‌مپ پوشش هر درس، پیش‌بینی درصد آمادگی روز آزمون
+- `rationaleBuilder.ts` — برای هر روز/هفته/ماه، لیست دلایل و trade-offها را متنی تولید می‌کند (نمایش در UI و ارسال به AI)
+- `planEngine.ts` — orchestrator: `buildFullPlan(analysis, style) → { monthly, weekly, daily[] }`
 
-All with `user_id`, RLS `auth.uid() = user_id`, proper GRANTs.
+منطق ترکیبی-هوشمند: هر بلوک `suggested_start_time` دارد ولی `flexible: true` است؛ کاربر می‌تواند drag کند و ساعت را override کند.
 
-## 2. Wizard (intake UI)
+## 2) اسکیمای دیتابیس
 
-Route: `/plan/wizard` (replaces current capacity dialog as entry point).
-Steps:
-1. Exam basics (name, type tabs: تستی/تشریحی/ترکیبی, date, time)
-2. Subjects loop — one card per subject with all volume fields + level slider + coefficient + target %
-3. Daily life — sleep/wake, school/uni/work toggles, weekend free
-4. Study style — reading speed, learning mode, focus minutes, tests/wk, reviews/wk
-5. Review & confirm
+مایگریشن جدید که به جداول موجود `plan_daily_v2` و `plan_block_v2` این‌ها را اضافه می‌کند:
 
-State persisted per step in `plan_wizard_state` (resume anywhere).
+- `plan_block_v2`: `suggested_start_time TIME`, `suggested_end_time TIME`, `block_type TEXT` (study|review|test|deep_focus|light|simulation|recovery), `is_locked BOOLEAN`, `spaced_from_block UUID`, `rationale TEXT`
+- `plan_daily_v2`: `phase TEXT` (foundation|mastery|simulation), `heat_score NUMERIC`, `is_simulation_day BOOLEAN`, `is_recovery_day BOOLEAN`
+- جدول جدید `plan_weekly_v2` — هفته‌های محاسبه‌شده با milestone، coverage-per-subject، goal، status
+- جدول جدید `plan_monthly_v2` — فاز، پیش‌بینی readiness%، milestoneهای هفتگی، heatmap JSON
+- جدول جدید `plan_ai_rationale` — توضیح متنی AI برای هر واحد (day/week/month) با لینک به آی‌دی
 
-## 3. Analysis engine (`src/lib/planino/v2/`)
+همه با GRANT، RLS، سیاست `auth.uid()`.
 
-Pure TS modules:
-- `volumeCalculator.ts` — per-subject required_minutes from pages × speed-factor + tests × per-test-time + videos / speed + reviews
-- `capacityCalculator.ts` — daily available minutes from study_style + weekend multiplier
-- `pressureModel.ts` — `pressure = required / available`, classify green/yellow/orange/red with thresholds
-- `priorityRanker.ts` — score = coefficient × importance × (1 − current_level) × urgency
-- `planBuilder.ts` — packs blocks per day respecting focus window, breaks, and review cadence (1-3-7-14 spaced)
-- `pressureResponder.ts` — for orange/red: drop low-priority topics, raise daily minutes, inject recovery slots
-- `replanner.ts` — nightly: read done blocks, compute deficit, regenerate next 7 days
+## 3) نماهای UI جدید (`/plan/*`)
 
-All deterministic, unit-testable, no AI call required for core math.
+- `/plan/today` — بازطراحی: تایم‌لاین عمودی ۲۴ ساعته + بلوک‌های رنگی با ساعت، drag & drop، دکمه «شروع» روی بلوک فعال، «چرا این بلوک؟» expandable (rationale)
+- `/plan/week` — گرید ۷ ستون × slotها (نمای Google Calendar فشرده)، هدف هفته، coverage bar هر درس، milestone هفته
+- `/plan/month` **(جدید)** — 
+  - نقشه راه ماهانه (فازها با رنگ‌های متفاوت)
+  - هیت‌مپ ۳۰×N (روز × درس) با شدت رنگ
+  - Readiness Forecast چارت (Recharts area)
+  - Milestoneهای هفتگی به‌صورت timeline
+- `SectionTabs` در `/plan/*` شامل: امروز | هفته | ماه | مشاور AI | ویزارد
 
-## 4. Status diagnosis screen
+کامپوننت‌های جدید در `src/components/plan/v3/`:
+- `DayTimeline.tsx`, `WeekGrid.tsx`, `MonthRoadmap.tsx`, `HeatmapCoverage.tsx`, `ReadinessChart.tsx`, `PhaseBadge.tsx`, `RationaleAccordion.tsx`, `SmartBlockCard.tsx`
 
-After analysis, show a **diagnosis card** with verdict, numeric facts ("روزی ۴۸۰ دقیقه نیاز داری، ظرفیت ۳۶۰") and recommended action button: «برنامه فشرده», «حذف هوشمند مباحث», «افزایش ساعت مطالعه».
+## 4) مشاور AI برنامه‌ریز
 
-## 5. Daily / Weekly plan UI
+`/plan/coach` (جدید) + Edge Function جدید `plan-coach`:
 
-Route: `/plan/today` and `/plan/week`.
-Each block shows: subject · topic · pages · tests · study_min · review_min, with check/skip/postpone actions that feed the replanner.
+- ورودی: `analysis` + `daily/weekly/monthly` + جلسات اخیر + تسک‌های عقب‌مانده
+- خروجی streaming: توضیح می‌دهد چرا این برنامه، کجاها ریسک دارد، ۳ سوال شخصی برای بهبود، پیشنهاد replan
+- دکمهٔ **«این تغییر را اعمال کن»** روی هر پیشنهاد → tool call به `apply_plan_change` (تغییر بلوک/جابجایی روز)
+- به‌روزرسانی `study-advisor` موجود برای شناخت داده‌های v3
 
-## 6. Nightly replanner
+مدل: `google/gemini-2.5-flash` از Lovable AI Gateway.
 
-Edge function `replan-tomorrow` (cron 23:30 local):
-- read today's `plan_block_v2` results
-- compute completion %, deferred minutes
-- call `replanner.ts` logic server-side
-- write new `plan_daily_v2` + `plan_block_v2` for next 7 days
-- append `plan_replan_log` entry
+## 5) اتصال به سیستم فعلی
 
-Also exposed as a manual `POST /replan` button.
-
-## 7. Dashboard integration (read-only hook)
-
-Add a single new hook `useTodaySmartPlan()` consumed by the existing Home widget area:
-- "امروز باید بخوانی" list
-- progress ring (done_min / planned_min)
-- next block CTA → `/study/timer?block=<id>`
-
-No other Home component touched.
-
-## 8. AI Chat integration
-
-Extend `src/lib/aiContextDispatcher.ts` to include a `smartPlan` slice:
-- today_blocks, week_goals, risk_level, deficit_minutes, weakest_subjects (lowest level × highest coefficient), feasibility_verdict
-- Edge function `study-advisor` system prompt extended with this slice so questions like «امروز چی بخونم؟», «به آزمون می‌رسم؟», «ضعیف‌ترین درسم؟», «اگه ۲ ساعت بیشتر بخونم؟» are answered from real data (scenario question uses a pure-TS `simulateExtraMinutes()` helper).
-
-## 9. Connections to Tasks / Exams / Roadmap / Reports
-
-- **Exams**: wizard reads/writes existing `exams` + `exam_topics` (additive fields stored in new tables, not overwriting).
-- **Tasks**: each generated block also surfaced as a virtual task in the Tasks list via a view-layer adapter — no schema change to `tasks`.
-- **Roadmap**: completion events from blocks emit `node_events` (already exists) so the skill tree keeps updating.
-- **Reports / Analytics**: existing analytics page reads `plan_daily_v2.total_done_minutes` via the same hook.
-
-## 10. Out of scope (explicitly untouched)
-
-Bottom nav, ComingSoon pages, Roadmap visual engine, Gamification logic, Groups, Notes, Onboarding, Focus mode UI, Theme.
-
----
+- `useFinalizeWizard` به `buildFullPlan` جدید سوییچ می‌شود و monthly/weekly را هم persist می‌کند
+- دکمهٔ «بازسازی» در همه نماها → replan فقط از امروز به بعد، فازها را حفظ می‌کند
+- بعد از هر جلسه مطالعه (`useStudySessions`): heat_score روز و coverage درس آپدیت و برای فردا اسپیس‌ری‌پتیشن تزریق می‌شود
 
 ## Technical notes
 
-- All new files under `src/lib/planino/v2/`, `src/components/plan/v2/`, `src/pages/plan/`, `src/hooks/usePlanV2*.ts`.
-- New edge function: `supabase/functions/replan-tomorrow/index.ts` (cron via `pg_cron` + `pg_net`, scheduled by a separate SQL the user approves).
-- Realtime channels use the unique-name pattern already adopted to avoid the prior `postgres_changes after subscribe()` crash.
+- زبان/فونت: RTL، Vazirmatn، گرادیان‌های موجود پروژه
+- react-router routes: افزودن `/plan/month`, `/plan/coach`
+- BottomNav: تب "Plan" همان می‌ماند، SectionTabs جدید
+- بدون شکستن API فعلی — `usePlanV2` باقی می‌ماند، هوک‌های v3 اضافه می‌شوند (`usePlanV3`)
 
----
+## نتیجهٔ کاربر می‌بیند
 
-## Suggested build order
-
-1. Migrations for the 8 new tables (one approval)
-2. Analysis engine + unit tests (pure TS, no UI)
-3. Wizard UI + persistence
-4. Diagnosis screen
-5. Daily/Weekly plan UI + block actions
-6. Nightly replanner edge function + cron
-7. Dashboard widget hook
-8. AI context slice + advisor prompt update
-
-Confirm and I'll start with **step 1 (migrations)**. If you want a smaller first slice (e.g. only engine + wizard, defer replanner) say so and I'll narrow scope.
+روزانه = تایم‌لاین دقیق ساعتی با «چرا این کار الان». هفتگی = گرید کالندر با هدف هفته. ماهانه = نقشه راه فازبندی‌شده با هیت‌مپ و پیش‌بینی درصد آمادگی. AI = مشاور واقعی که برنامه را توضیح می‌دهد و با یک کلیک تغییر می‌دهد.
