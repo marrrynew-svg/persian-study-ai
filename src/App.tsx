@@ -45,6 +45,8 @@ import CoachFeynman from "./pages/placeholders/CoachFeynman";
 import SmartWizard from "./pages/plan/SmartWizard";
 import SmartToday from "./pages/plan/SmartToday";
 import SmartWeek from "./pages/plan/SmartWeek";
+import SmartMonth from "./pages/plan/SmartMonth";
+import PlanCoach from "./pages/plan/PlanCoach";
 import { useStudySessionQueueSync } from "@/hooks/useStudySessions";
 import { useEffect } from "react";
 import { forceAIContextRefresh } from "@/lib/aiContextDispatcher";
@@ -115,6 +117,8 @@ function AppRoutes() {
       <Route path="/plan/wizard" element={<ProtectedRoute><SmartWizard /></ProtectedRoute>} />
       <Route path="/plan/today" element={<ProtectedRoute><SmartToday /></ProtectedRoute>} />
       <Route path="/plan/week" element={<ProtectedRoute><SmartWeek /></ProtectedRoute>} />
+      <Route path="/plan/month" element={<ProtectedRoute><SmartMonth /></ProtectedRoute>} />
+      <Route path="/plan/coach" element={<ProtectedRoute><PlanCoach /></ProtectedRoute>} />
 
       {/* Plan section */}
       <Route path="/reviews" element={<ProtectedRoute><Reviews /></ProtectedRoute>} />
