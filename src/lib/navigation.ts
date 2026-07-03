@@ -40,6 +40,8 @@ export const SECTIONS: Section[] = [
     subs: [
       { path: "/plan/today", label: "امروز", icon: CalendarDays },
       { path: "/plan/week", label: "هفته", icon: CalendarRange },
+      { path: "/plan/month", label: "ماه", icon: CalendarRange },
+      { path: "/plan/coach", label: "مشاور AI", icon: Sparkles },
       { path: "/plan/wizard", label: "مشاور", icon: Sparkles },
       { path: "/planner", label: "کلاسیک", icon: CalendarRange },
       { path: "/exams", label: "آزمون‌ها", icon: GraduationCap },

@@ -742,6 +742,42 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_ai_rationale: {
+        Row: {
+          created_at: string
+          details: Json
+          id: string
+          model: string | null
+          scope: string
+          summary: string
+          target_date: string | null
+          target_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          id?: string
+          model?: string | null
+          scope: string
+          summary: string
+          target_date?: string | null
+          target_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          id?: string
+          model?: string | null
+          scope?: string
+          summary?: string
+          target_date?: string | null
+          target_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       plan_analysis: {
         Row: {
           created_at: string
@@ -792,17 +828,23 @@ export type Database = {
       plan_block_v2: {
         Row: {
           block_order: number
+          block_type: string
           created_at: string
           daily_id: string
           done_minutes: number
           id: string
+          is_locked: boolean
           pages: number
+          rationale: string | null
           recovery_minutes: number
           review_minutes: number
+          spaced_from_block: string | null
           status: string
           study_minutes: number
           subject_input_id: string | null
           subject_name: string
+          suggested_end_time: string | null
+          suggested_start_time: string | null
           tests: number
           topic: string | null
           updated_at: string
@@ -810,17 +852,23 @@ export type Database = {
         }
         Insert: {
           block_order?: number
+          block_type?: string
           created_at?: string
           daily_id: string
           done_minutes?: number
           id?: string
+          is_locked?: boolean
           pages?: number
+          rationale?: string | null
           recovery_minutes?: number
           review_minutes?: number
+          spaced_from_block?: string | null
           status?: string
           study_minutes?: number
           subject_input_id?: string | null
           subject_name: string
+          suggested_end_time?: string | null
+          suggested_start_time?: string | null
           tests?: number
           topic?: string | null
           updated_at?: string
@@ -828,17 +876,23 @@ export type Database = {
         }
         Update: {
           block_order?: number
+          block_type?: string
           created_at?: string
           daily_id?: string
           done_minutes?: number
           id?: string
+          is_locked?: boolean
           pages?: number
+          rationale?: string | null
           recovery_minutes?: number
           review_minutes?: number
+          spaced_from_block?: string | null
           status?: string
           study_minutes?: number
           subject_input_id?: string | null
           subject_name?: string
+          suggested_end_time?: string | null
+          suggested_start_time?: string | null
           tests?: number
           topic?: string | null
           updated_at?: string
@@ -865,8 +919,13 @@ export type Database = {
         Row: {
           created_at: string
           date: string
+          day_goal: string | null
           exam_setup_id: string | null
+          heat_score: number | null
           id: string
+          is_recovery_day: boolean | null
+          is_simulation_day: boolean | null
+          phase: string | null
           status: string
           total_done_minutes: number
           total_planned_minutes: number
@@ -876,8 +935,13 @@ export type Database = {
         Insert: {
           created_at?: string
           date: string
+          day_goal?: string | null
           exam_setup_id?: string | null
+          heat_score?: number | null
           id?: string
+          is_recovery_day?: boolean | null
+          is_simulation_day?: boolean | null
+          phase?: string | null
           status?: string
           total_done_minutes?: number
           total_planned_minutes?: number
@@ -887,8 +951,13 @@ export type Database = {
         Update: {
           created_at?: string
           date?: string
+          day_goal?: string | null
           exam_setup_id?: string | null
+          heat_score?: number | null
           id?: string
+          is_recovery_day?: boolean | null
+          is_simulation_day?: boolean | null
+          phase?: string | null
           status?: string
           total_done_minutes?: number
           total_planned_minutes?: number
@@ -994,6 +1063,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      plan_monthly_v2: {
+        Row: {
+          created_at: string
+          exam_setup_id: string | null
+          heatmap: Json
+          id: string
+          month_end: string
+          month_start: string
+          phases: Json
+          predicted_readiness_percent: number | null
+          rationale: string | null
+          readiness_forecast: Json
+          total_days: number
+          updated_at: string
+          user_id: string
+          weekly_milestones: Json
+        }
+        Insert: {
+          created_at?: string
+          exam_setup_id?: string | null
+          heatmap?: Json
+          id?: string
+          month_end: string
+          month_start: string
+          phases?: Json
+          predicted_readiness_percent?: number | null
+          rationale?: string | null
+          readiness_forecast?: Json
+          total_days?: number
+          updated_at?: string
+          user_id: string
+          weekly_milestones?: Json
+        }
+        Update: {
+          created_at?: string
+          exam_setup_id?: string | null
+          heatmap?: Json
+          id?: string
+          month_end?: string
+          month_start?: string
+          phases?: Json
+          predicted_readiness_percent?: number | null
+          rationale?: string | null
+          readiness_forecast?: Json
+          total_days?: number
+          updated_at?: string
+          user_id?: string
+          weekly_milestones?: Json
+        }
+        Relationships: []
       }
       plan_replan_log: {
         Row: {
@@ -1152,6 +1272,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      plan_weekly_v2: {
+        Row: {
+          coverage: Json
+          created_at: string
+          done_minutes: number
+          exam_setup_id: string | null
+          id: string
+          milestones: Json
+          phase: string
+          rationale: string | null
+          status: string
+          target_minutes: number
+          updated_at: string
+          user_id: string
+          week_end: string
+          week_index: number
+          week_start: string
+          weekly_goal: string | null
+        }
+        Insert: {
+          coverage?: Json
+          created_at?: string
+          done_minutes?: number
+          exam_setup_id?: string | null
+          id?: string
+          milestones?: Json
+          phase?: string
+          rationale?: string | null
+          status?: string
+          target_minutes?: number
+          updated_at?: string
+          user_id: string
+          week_end: string
+          week_index?: number
+          week_start: string
+          weekly_goal?: string | null
+        }
+        Update: {
+          coverage?: Json
+          created_at?: string
+          done_minutes?: number
+          exam_setup_id?: string | null
+          id?: string
+          milestones?: Json
+          phase?: string
+          rationale?: string | null
+          status?: string
+          target_minutes?: number
+          updated_at?: string
+          user_id?: string
+          week_end?: string
+          week_index?: number
+          week_start?: string
+          weekly_goal?: string | null
+        }
+        Relationships: []
       }
       plan_wizard_state: {
         Row: {
