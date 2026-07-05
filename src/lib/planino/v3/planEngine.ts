@@ -1,7 +1,7 @@
 import type { AnalysisResult, StudyStyle } from "../v2/types";
 import { rankSubjects } from "../v2/priorityRanker";
 import { dailyCapacityMinutes } from "../v2/capacityCalculator";
-import { buildDaySlots, allocateBlock } from "./timeSlotEngine";
+import { buildDaySlots, allocateBlock, allocateBlockNearHour } from "./timeSlotEngine";
 import { SR_INTERVALS } from "./spacedRepetition";
 import { rankHoursByEnergy, energyAtHour } from "./chronotypeEngine";
 import type {
