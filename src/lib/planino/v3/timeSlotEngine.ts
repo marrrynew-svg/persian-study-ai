@@ -61,3 +61,36 @@ export function allocateBlock(slots: TimeSlot[], minutes: number): { start: stri
   }
   return null;
 }
+
+/** Try to allocate a block starting near a preferred hour; falls back to null so caller can try allocateBlock. */
+export function allocateBlockNearHour(
+  slots: TimeSlot[],
+  minutes: number,
+  preferredHour?: number,
+): { start: string; end: string } | null {
+  if (preferredHour == null) return null;
+  const targetMin = preferredHour * 60;
+  // Find slot containing the preferred hour with enough room
+  for (let i = 0; i < slots.length; i++) {
+    const s = slots[i];
+    const sMin = toMin(s.start);
+    const eMin = toMin(s.end);
+    if (s.minutes < minutes) continue;
+    const startMin = Math.max(sMin, Math.min(targetMin, eMin - minutes));
+    if (startMin >= sMin && startMin + minutes <= eMin) {
+      const start = fromMin(startMin);
+      const end = fromMin(startMin + minutes);
+      // Split slot into before + after
+      const before = startMin - sMin;
+      const after = eMin - (startMin + minutes) - 10;
+      if (after > 0) {
+        slots[i] = { start: fromMin(startMin + minutes + 10), end: s.end, minutes: after };
+      } else {
+        slots.splice(i, 1);
+      }
+      if (before >= 30) slots.splice(i, 0, { start: s.start, end: fromMin(startMin - 10), minutes: before - 10 });
+      return { start, end };
+    }
+  }
+  return null;
+}
