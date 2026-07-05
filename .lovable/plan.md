@@ -1,73 +1,133 @@
+# Planino v4 — مشاور و برنامه‌ریز تحصیلی حرفه‌ای
 
-# Planino v3 — Elite Study Planning System
+## چشم‌انداز
+یک سیستم برنامه‌ریزی که حس یه «مشاور شخصی حرفه‌ای کنکور» رو بده — نه یه لیست ساده تسک. ورودی عمیق از کاربر، الگوریتم چندلایه، و سه نمای بصری خفن.
 
-سیستم فعلی بلوک‌ها را «تخت» تولید می‌کند: بدون ساعت، بدون فاصله‌گذاری تکرار، بدون منطق ماهانه، بدون توضیح AI. بازسازی end-to-end در چهار لایه:
+---
 
-## 1) موتور برنامه‌ریزی (Planino v3 core)
+## ۱. ویزارد حرفه‌ای (۱۸ سوال · ۶ مرحله)
 
-فایل‌های جدید در `src/lib/planino/v3/`:
+فرم چند مرحله‌ای با progress bar، انیمیشن، ذخیره‌ی خودکار در هر مرحله.
 
-- `types.ts` — تایپ‌های جدید: `TimeSlot`, `DailyPlan`, `WeeklyPlan`, `MonthlyPlan`, `SpacedItem`, `PlanRationale`
-- `timeSlotEngine.ts` — بلوک زمان‌بندی ساعتی: از `wake_time` تا `sleep_time`، حذف بازهٔ مدرسه/دانشگاه/کار، درج بلوک تمرکز ۹۰′ + استراحت ۱۵′ (روش پومودورو بلند)، بلوک ورزش ۳۰′، ۲ بازهٔ تست‌زنی هفتگی
-- `spacedRepetition.ts` — الگوریتم SM-2 ساده: هر مبحثی که مطالعه شد در روز +1/+3/+7/+16 دوبار مرور می‌شود (بلوک `review`)
-- `dailyPlanner.ts` — روزانه: اولویت‌بندی موضوعات با `priorityRanker` + تزریق مرورها + بلوک تست + ۱ بلوک تمرکز عمیق صبحگاهی
-- `weeklyPlanner.ts` — هفتگی: توزیع پوشش دروس بر ۷ روز با قانون تنوع (هیچ درسی ۳ روز پشت هم غالب نباشد)، ۱ روز آزمون شبیه‌ساز، ۱ روز جبرانی نیمه‌سبک
-- `monthlyPlanner.ts` — ماهانه: تقسیم روزهای مانده به سه فاز (`foundation` 50%, `mastery` 30%, `simulation` 20%)، تعیین Milestoneهای هفتگی، هیت‌مپ پوشش هر درس، پیش‌بینی درصد آمادگی روز آزمون
-- `rationaleBuilder.ts` — برای هر روز/هفته/ماه، لیست دلایل و trade-offها را متنی تولید می‌کند (نمایش در UI و ارسال به AI)
-- `planEngine.ts` — orchestrator: `buildFullPlan(analysis, style) → { monthly, weekly, daily[] }`
+**مرحله ۱ — هدف و آزمون** (`plan_exam_setup`)
+- نوع کنکور، رشته، تاریخ آزمون، رتبه/تراز هدف، دانشگاه‌های آرزو (۳ اولویت)
 
-منطق ترکیبی-هوشمند: هر بلوک `suggested_start_time` دارد ولی `flexible: true` است؛ کاربر می‌تواند drag کند و ساعت را override کند.
+**مرحله ۲ — Chronotype و انرژی** (`plan_study_style`)
+- ساعت بیداری/خواب واقعی نه ایده‌آل، پیک انرژی روز (صبح/ظهر/عصر/شب)، ساعات مرده (افت انرژی)، خواب نیم‌روز
 
-## 2) اسکیمای دیتابیس
+**مرحله ۳ — مسئولیت‌های زندگی**
+- مدرسه/دانشگاه/کار (ساعات دقیق هر روز هفته)، رفت‌وآمد، ورزش، خانواده
 
-مایگریشن جدید که به جداول موجود `plan_daily_v2` و `plan_block_v2` این‌ها را اضافه می‌کند:
+**مرحله ۴ — روانشناسی و رفتار**
+- تحمل فشار (اسلایدر)، سبک یادگیری (بصری/شنیداری/عملی)، سبک مرور ترجیحی (فلش‌کارت/تست/خلاصه)، واکنش به شکست (اسلایدر ریکاوری)، سطح انگیزه فعلی
 
-- `plan_block_v2`: `suggested_start_time TIME`, `suggested_end_time TIME`, `block_type TEXT` (study|review|test|deep_focus|light|simulation|recovery), `is_locked BOOLEAN`, `spaced_from_block UUID`, `rationale TEXT`
-- `plan_daily_v2`: `phase TEXT` (foundation|mastery|simulation), `heat_score NUMERIC`, `is_simulation_day BOOLEAN`, `is_recovery_day BOOLEAN`
-- جدول جدید `plan_weekly_v2` — هفته‌های محاسبه‌شده با milestone، coverage-per-subject، goal، status
-- جدول جدید `plan_monthly_v2` — فاز، پیش‌بینی readiness%، milestoneهای هفتگی، heatmap JSON
-- جدول جدید `plan_ai_rationale` — توضیح متنی AI برای هر واحد (day/week/month) با لینک به آی‌دی
+**مرحله ۵ — نقشه‌ی دروس** (`plan_subject_inputs`)
+- برای هر درس: سطح فعلی (خیلی ضعیف تا مسلط)، اولویت شخصی، درصد کنکورهای آزمایشی اخیر، فصل‌های مشکل‌دار (تگ)، منبع مطالعه، سرعت مطالعه صفحه/دقیقه
 
-همه با GRANT، RLS، سیاست `auth.uid()`.
+**مرحله ۶ — استراتژی**
+- نسبت ترجیحی مطالعه/تست/مرور، سبک برنامه (فشرده/متعادل/آرام)، روزهای شبیه‌ساز در هفته، حداقل روز استراحت هفته
 
-## 3) نماهای UI جدید (`/plan/*`)
+---
 
-- `/plan/today` — بازطراحی: تایم‌لاین عمودی ۲۴ ساعته + بلوک‌های رنگی با ساعت، drag & drop، دکمه «شروع» روی بلوک فعال، «چرا این بلوک؟» expandable (rationale)
-- `/plan/week` — گرید ۷ ستون × slotها (نمای Google Calendar فشرده)، هدف هفته، coverage bar هر درس، milestone هفته
-- `/plan/month` **(جدید)** — 
-  - نقشه راه ماهانه (فازها با رنگ‌های متفاوت)
-  - هیت‌مپ ۳۰×N (روز × درس) با شدت رنگ
-  - Readiness Forecast چارت (Recharts area)
-  - Milestoneهای هفتگی به‌صورت timeline
-- `SectionTabs` در `/plan/*` شامل: امروز | هفته | ماه | مشاور AI | ویزارد
+## ۲. موتور Planino v4 (`src/lib/planino/v4/`)
 
-کامپوننت‌های جدید در `src/components/plan/v3/`:
-- `DayTimeline.tsx`, `WeekGrid.tsx`, `MonthRoadmap.tsx`, `HeatmapCoverage.tsx`, `ReadinessChart.tsx`, `PhaseBadge.tsx`, `RationaleAccordion.tsx`, `SmartBlockCard.tsx`
+### فایل‌های جدید
+- **`chronotypeEngine.ts`** — نگاشت پیک انرژی → بهترین ساعات برای Deep Focus / Light / Test
+- **`phaseArchitect.ts`** — سه فاز پویا: Foundation (۴۰٪) → Mastery (۴۰٪) → Simulation (۲۰٪)، با تنظیم خودکار بر اساس روزهای باقی‌مانده
+- **`spacedRepetition.ts`** — بازنویسی با الگوریتم SM-2 واقعی (interval، ease factor، quality response)
+- **`fatigueModel.ts`** — مدل خستگی: بار روزانه، امتیاز تراکم هفتگی، تشخیص خطر burnout
+- **`balanceEngine.ts`** — تعادل خودکار Study/Review/Test/Simulation
+- **`dailyComposer.ts`** — چیدن بلوک‌ها در تایم‌اسلات‌های Chronotype-aware با Pomodoro و ریکاوری
+- **`weeklyStrategist.ts`** — توزیع دروس با اولویت‌بندی، milestones، coverage matrix
+- **`monthlyForecaster.ts`** — پیش‌بینی آمادگی روزبه‌روز، heatmap، فازبندی
+- **`rationaleWriter.ts`** — تولید توضیح فارسی برای هر بلوک/روز/هفته (چرا این؟)
+- **`planEngineV4.ts`** — ارکستراتور اصلی
 
-## 4) مشاور AI برنامه‌ریز
+### قواعد کلیدی موتور
+- Deep Focus فقط در ساعات پیک انرژی
+- تست حداقل ۲ ساعت بعد از شروع مطالعه اون درس
+- مرور SM-2 بلاک‌های قبلی به صورت خودکار در روزهای بعد
+- روز ریکاوری اجباری بعد از ۶ روز فشرده
+- شبیه‌ساز فقط در فاز mastery/simulation
 
-`/plan/coach` (جدید) + Edge Function جدید `plan-coach`:
+---
 
-- ورودی: `analysis` + `daily/weekly/monthly` + جلسات اخیر + تسک‌های عقب‌مانده
-- خروجی streaming: توضیح می‌دهد چرا این برنامه، کجاها ریسک دارد، ۳ سوال شخصی برای بهبود، پیشنهاد replan
-- دکمهٔ **«این تغییر را اعمال کن»** روی هر پیشنهاد → tool call به `apply_plan_change` (تغییر بلوک/جابجایی روز)
-- به‌روزرسانی `study-advisor` موجود برای شناخت داده‌های v3
+## ۳. نماهای بصری Glassmorphism رنگی
 
-مدل: `google/gemini-2.5-flash` از Lovable AI Gateway.
+پالت: `#0f172a` بستر · `#7c3aed` بنفش · `#ec4899` صورتی · `#06b6d4` فیروزه‌ای
 
-## 5) اتصال به سیستم فعلی
+هر درس یه گرادیانت اختصاصی داره که در تمام نماها consistent باشه.
 
-- `useFinalizeWizard` به `buildFullPlan` جدید سوییچ می‌شود و monthly/weekly را هم persist می‌کند
-- دکمهٔ «بازسازی» در همه نماها → replan فقط از امروز به بعد، فازها را حفظ می‌کند
-- بعد از هر جلسه مطالعه (`useStudySessions`): heat_score روز و coverage درس آپدیت و برای فردا اسپیس‌ری‌پتیشن تزریق می‌شود
+### `/plan/today` — Daily Timeline زنده
+- تایم‌لاین عمودی ۲۴ ساعته با نشانگر «الان» (خط قرمز متحرک)
+- بلوک‌های شیشه‌ای با backdrop-blur + گرادیانت درس
+- کنار هر بلوک: آیکن نوع (🎯 Deep / 📖 Study / 🔁 Review / ✍️ Test / 🎮 Simulation / 🌙 Recovery)
+- Header: فاز روز، heat score (شعله متحرک)، هدف روز، KPI (بلوک انجام‌شده، دقیقه واقعی/برنامه)
+- تعامل: کلیک بلوک → دیالوگ جزئیات + rationale + اکشن‌ها (شروع تایمر، جابجایی، skip، extend)
+- Empty state حرفه‌ای
 
-## Technical notes
+### `/plan/week` — Weekly Grid Notion-style
+- گرید ۷ ستون × ۱۸ ردیف (۶ صبح تا ۱۲ شب)
+- بلوک‌های شیشه‌ای با تراکم پویا (رنگ گرم = فشرده)
+- Sidebar: هدف هفته، milestones، coverage bars هر درس با گرادیانت
+- بالای گرید: نوار فاز، توزیع تست/مطالعه/مرور، پیش‌بینی موفقیت هفته
+- کلیک روی روز → نمای Daily
+- درگ برای جابجایی بلوک بین روزها (اختیاری v1)
 
-- زبان/فونت: RTL، Vazirmatn، گرادیان‌های موجود پروژه
-- react-router routes: افزودن `/plan/month`, `/plan/coach`
-- BottomNav: تب "Plan" همان می‌ماند، SectionTabs جدید
-- بدون شکستن API فعلی — `usePlanV2` باقی می‌ماند، هوک‌های v3 اضافه می‌شوند (`usePlanV3`)
+### `/plan/month` — Monthly Command Center
+- ۳۰ روز × N درس heatmap با شدت رنگ = تراکم
+- نوار فازها (Foundation / Mastery / Simulation) با progress
+- چارت پیش‌بینی آمادگی (Recharts area chart با گرادیانت)
+- کارت milestone هر هفته
+- ریسک burnout با warning
+- دکمه «چرا این ماه اینطوری چیده شده؟» → توضیح AI
 
-## نتیجهٔ کاربر می‌بیند
+---
 
-روزانه = تایم‌لاین دقیق ساعتی با «چرا این کار الان». هفتگی = گرید کالندر با هدف هفته. ماهانه = نقشه راه فازبندی‌شده با هیت‌مپ و پیش‌بینی درصد آمادگی. AI = مشاور واقعی که برنامه را توضیح می‌دهد و با یک کلیک تغییر می‌دهد.
+## ۴. Database Migration
+
+اضافه شدن ستون‌ها به جداول موجود (بدون تخریب):
+
+**`plan_study_style`** (+ فیلدها):
+- `energy_peaks jsonb` (آرایه ساعات پیک)
+- `dead_hours jsonb`
+- `preferred_review_style text`
+- `stress_tolerance int` (1-10)
+- `motivation_level int` (1-10)
+- `failure_recovery int` (1-10)
+
+**`plan_subject_inputs`** (+ فیلدها):
+- `mock_exam_percent numeric`
+- `weak_chapters text[]`
+- `reading_speed_ppm numeric`
+- `preferred_ratio jsonb` (study/test/review)
+
+**`plan_block_v2`** (+ فیلدها):
+- `energy_required text` (low/mid/high)
+- `spaced_interval_days int`
+- `sm2_ease numeric`
+
+---
+
+## ۵. مسیر پیاده‌سازی (به ترتیب)
+
+1. Migration دیتابیس
+2. تایپ‌ها و موتور v4 (تمام فایل‌های `src/lib/planino/v4/`)
+3. ویزارد ۶ مرحله‌ای جدید (`src/pages/plan/SmartWizard.tsx` بازنویسی + کامپوننت‌های استپ)
+4. هوک `usePlanV4` و jack کردن `buildFullPlan` به موتور جدید
+5. بازطراحی `/plan/today` با Timeline زنده
+6. بازطراحی `/plan/week` با گرید Notion-style
+7. بازطراحی `/plan/month` با Command Center
+8. کامپوننت‌های مشترک: `GlassBlock`, `PhaseBar`, `EnergyIndicator`, `SubjectGradient`
+
+---
+
+## نکات فنی
+- تمام کامپوننت‌ها RTL و Vazirmatn
+- استفاده از design tokens موجود (بدون hardcode رنگ)
+- Framer Motion برای انیمیشن بلوک‌ها و ترنزیشن‌های فاز
+- Recharts برای heatmap و forecast
+- `usePlanV2` و `usePlanV3` دست نمی‌خورن (backward compat)
+- بدون AI call در موتور — همه چیز deterministic تا سریع باشه؛ AI فقط برای rationale اختیاری در `/plan/coach`
+
+خروجی: یه ابزار مشاوره‌ی تحصیلی که حس «داشتن یه استاد راهنمای شخصی» رو بده، نه یه to-do list.

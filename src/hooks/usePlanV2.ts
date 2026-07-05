@@ -4,6 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { ExamSetup, SubjectInput, StudyStyle, AnalysisResult } from "@/lib/planino/v2/types";
 import { runAnalysis } from "@/lib/planino/v2/pressureModel";
 import { buildPlan } from "@/lib/planino/v2/planBuilder";
+import { buildFullPlan } from "@/lib/planino/v3/planEngine";
+import type { StudyStyleExt } from "@/lib/planino/v3/types";
 import { toast } from "sonner";
 
 const sb: any = supabase;
@@ -87,7 +89,7 @@ export function useFinalizeWizard() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { exam: ExamSetup; subjects: SubjectInput[]; style: StudyStyle }) => {
+    mutationFn: async (input: { exam: ExamSetup; subjects: SubjectInput[]; style: StudyStyle; ext?: StudyStyleExt }) => {
       if (!user) throw new Error("no auth");
       // Deactivate previous
       await sb.from("plan_exam_setup").update({ is_active: false }).eq("user_id", user.id);
@@ -149,13 +151,21 @@ export function useFinalizeWizard() {
         reasoning: analysis as any,
       });
 
-      // Build plan for next 14 days and persist
-      const days = buildPlan(analysis, input.style, { horizonDays: 14 });
-      // Wipe future plans for this exam
+      // Build v3 smart plan (30-day horizon) with extended prefs
+      const plan = buildFullPlan(analysis, input.style, { horizonDays: 30, ext: input.ext });
       const todayStr = new Date().toISOString().slice(0, 10);
-      await sb.from("plan_daily_v2").delete().eq("user_id", user.id).gte("date", todayStr);
+      // Wipe future daily+weekly+monthly
+      const { data: futureDays } = await sb
+        .from("plan_daily_v2").select("id").eq("user_id", user.id).gte("date", todayStr);
+      const fids = (futureDays || []).map((d: any) => d.id);
+      if (fids.length) {
+        await sb.from("plan_block_v2").delete().in("daily_id", fids);
+        await sb.from("plan_daily_v2").delete().in("id", fids);
+      }
+      await sb.from("plan_weekly_v2").delete().eq("user_id", user.id).gte("week_start", todayStr);
+      await sb.from("plan_monthly_v2").delete().eq("user_id", user.id).gte("month_start", todayStr);
 
-      for (const d of days) {
+      for (const d of plan.daily) {
         const { data: dayRow, error: dayErr } = await sb
           .from("plan_daily_v2")
           .insert({
@@ -165,6 +175,11 @@ export function useFinalizeWizard() {
             total_planned_minutes: d.total_planned_minutes,
             total_done_minutes: 0,
             status: "pending",
+            phase: d.phase,
+            heat_score: d.heat_score,
+            is_simulation_day: d.is_simulation_day,
+            is_recovery_day: d.is_recovery_day,
+            day_goal: d.day_goal,
           })
           .select()
           .single();
@@ -183,17 +198,40 @@ export function useFinalizeWizard() {
               recovery_minutes: b.recovery_minutes,
               block_order: b.block_order,
               status: "pending",
+              block_type: b.block_type,
+              suggested_start_time: b.suggested_start_time || null,
+              suggested_end_time: b.suggested_end_time || null,
+              is_locked: !!b.is_locked,
+              rationale: b.rationale || null,
             })),
           );
         }
       }
+      if (plan.weekly.length) {
+        await sb.from("plan_weekly_v2").insert(plan.weekly.map((w) => ({
+          user_id: user.id, exam_setup_id: examRow.id, week_start: w.week_start,
+          week_end: w.week_end, week_index: w.week_index, phase: w.phase,
+          weekly_goal: w.weekly_goal, target_minutes: w.target_minutes,
+          coverage: w.coverage, milestones: w.milestones, rationale: w.rationale,
+        })));
+      }
+      await sb.from("plan_monthly_v2").insert({
+        user_id: user.id, exam_setup_id: examRow.id,
+        month_start: plan.monthly.month_start, month_end: plan.monthly.month_end,
+        total_days: plan.monthly.total_days, phases: plan.monthly.phases,
+        weekly_milestones: plan.monthly.weekly_milestones, heatmap: plan.monthly.heatmap,
+        readiness_forecast: plan.monthly.readiness_forecast,
+        predicted_readiness_percent: plan.monthly.predicted_readiness_percent,
+        rationale: plan.monthly.rationale,
+      });
 
       await sb.from("plan_wizard_state").upsert(
-        { user_id: user.id, completed: true, current_step: 99, answers: {} },
+        { user_id: user.id, completed: true, current_step: 99,
+          answers: { styleExt: input.ext || {} } },
         { onConflict: "user_id" },
       );
 
-      return { analysis, days: days.length };
+      return { analysis, days: plan.daily.length };
     },
     onSuccess: (r) => {
       qc.invalidateQueries();

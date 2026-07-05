@@ -121,9 +121,10 @@ export function useBuildPlanV3() {
         .limit(1)
         .maybeSingle();
       if (!exam) throw new Error("هیچ آزمون فعالی نیست");
-      const [{ data: subs }, { data: style }] = await Promise.all([
+      const [{ data: subs }, { data: style }, { data: wiz }] = await Promise.all([
         sb.from("plan_subject_inputs").select("*").eq("user_id", user.id).eq("exam_setup_id", exam.id),
         sb.from("plan_study_style").select("*").eq("user_id", user.id).maybeSingle(),
+        sb.from("plan_wizard_state").select("answers").eq("user_id", user.id).maybeSingle(),
       ]);
       if (!subs?.length || !style) throw new Error("اطلاعات ورودی ناقص است");
       const analysis = runAnalysis(
@@ -131,7 +132,8 @@ export function useBuildPlanV3() {
         subs as any,
         style as any,
       );
-      const plan = buildFullPlan(analysis, style as any, { horizonDays: opts.horizonDays ?? 30 });
+      const ext = (wiz?.answers as any)?.styleExt || undefined;
+      const plan = buildFullPlan(analysis, style as any, { horizonDays: opts.horizonDays ?? 30, ext });
       await persistFullPlan(user.id, exam.id, plan);
       await sb.from("plan_analysis").insert({
         user_id: user.id, exam_setup_id: exam.id,

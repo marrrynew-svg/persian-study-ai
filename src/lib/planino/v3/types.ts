@@ -79,3 +79,29 @@ export interface FullPlanV3 {
 }
 
 export type { AnalysisResult, StudyStyle, SubjectRequired };
+
+/** Advanced preferences captured by the pro wizard (kept in wizard_state.answers.styleExt). */
+export type Chronotype = "morning_lark" | "afternoon" | "night_owl" | "flexible";
+export type LearningPref = "visual" | "audio" | "kinesthetic" | "reading";
+export type ReviewPref = "flashcards" | "tests" | "summary" | "teach_back";
+export type PlanIntensity = "intense" | "balanced" | "relaxed";
+
+export interface StudyStyleExt {
+  chronotype?: Chronotype;
+  energy_peaks?: string[]; // e.g. ["morning","evening"]
+  dead_hours?: string[]; // e.g. ["14:00-16:00"]
+  nap_minutes?: number;
+  stress_tolerance?: number; // 1..10
+  motivation_level?: number; // 1..10
+  failure_recovery?: number; // 1..10
+  learning_pref?: LearningPref;
+  review_pref?: ReviewPref;
+  plan_intensity?: PlanIntensity;
+  study_test_review_ratio?: { study: number; test: number; review: number };
+  simulation_days_per_week?: number;
+  min_rest_days_per_week?: number;
+  commute_minutes_per_day?: number;
+  exercise_days_per_week?: number;
+  target_rank?: number;
+  dream_universities?: string[];
+}
