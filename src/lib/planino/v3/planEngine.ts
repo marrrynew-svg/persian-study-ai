@@ -3,6 +3,7 @@ import { rankSubjects } from "../v2/priorityRanker";
 import { dailyCapacityMinutes } from "../v2/capacityCalculator";
 import { buildDaySlots, allocateBlock } from "./timeSlotEngine";
 import { SR_INTERVALS } from "./spacedRepetition";
+import { rankHoursByEnergy, energyAtHour } from "./chronotypeEngine";
 import type {
   BlockType,
   DailyPlanV3,
@@ -11,6 +12,7 @@ import type {
   Phase,
   SmartBlock,
   WeeklyPlanV3,
+  StudyStyleExt,
 } from "./types";
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
@@ -38,6 +40,7 @@ function pagesFromMinutes(min: number, style: StudyStyle): number {
 export interface BuildOptsV3 {
   horizonDays?: number;
   startDate?: Date;
+  ext?: StudyStyleExt;
 }
 
 export function buildFullPlan(
@@ -48,6 +51,13 @@ export function buildFullPlan(
   const horizon = Math.min(opts.horizonDays ?? 30, analysis.days_left);
   const start = opts.startDate ?? new Date();
   start.setHours(0, 0, 0, 0);
+  const ext = opts.ext || {};
+  const intensityMul = ext.plan_intensity === "intense" ? 1.15 : ext.plan_intensity === "relaxed" ? 0.85 : 1;
+  const ratio = ext.study_test_review_ratio || { study: 60, test: 25, review: 15 };
+  const minRestDays = ext.min_rest_days_per_week ?? 1;
+  const targetSimDaysPerWeek = ext.simulation_days_per_week ?? 1;
+  // Running fatigue: last 7 days total load (minutes)
+  const loadHistory: number[] = [];
 
   // Track remaining minutes per subject
   const ranked = rankSubjects(analysis.per_subject, analysis.days_left);
@@ -68,6 +78,7 @@ export function buildFullPlan(
   // scheduled reviews: date → [{subject}]
   const reviews: Record<string, { subject_name: string; subject_input_id?: string; offset: number }[]> = {};
 
+  const bestHours = rankHoursByEnergy(style, ext);
   for (let i = 0; i < horizon; i++) {
     const date = new Date(start.getTime() + i * 86400000);
     const dateStr = ymd(date);
@@ -75,27 +86,36 @@ export function buildFullPlan(
     const isWeekend = dow === 5 || dow === 6;
     const phase: Phase = phaseForDayIndex(i, horizon);
 
-    // Weekly rhythm: every 7th day = simulation, day 4 = light recovery
     const dayInWeek = i % 7;
-    const is_simulation_day = phase !== "foundation" && dayInWeek === 6;
-    const is_recovery_day = dayInWeek === 3 && analysis.risk_level !== "red";
+    // Rolling 7-day fatigue score
+    const last7 = loadHistory.slice(-7);
+    const fatigue = last7.reduce((a, b) => a + b, 0) / Math.max(1, 60 * 7);
+    const burnoutRisk = fatigue > 5.5; // avg > 5.5h/day for a week
+    const is_simulation_day =
+      phase !== "foundation" && (dayInWeek === 6 || (targetSimDaysPerWeek >= 2 && dayInWeek === 2));
+    const is_recovery_day =
+      (dayInWeek === 6 - minRestDays && analysis.risk_level !== "red") ||
+      (burnoutRisk && dayInWeek % 3 === 0);
 
-    let capMin = dailyCapacityMinutes(style, isWeekend);
-    if (analysis.risk_level === "orange" || analysis.risk_level === "red") capMin = Math.round(capMin * 1.15);
-    if (is_recovery_day) capMin = Math.round(capMin * 0.6);
+    let capMin = Math.round(dailyCapacityMinutes(style, isWeekend) * intensityMul);
+    if (analysis.risk_level === "orange" || analysis.risk_level === "red") capMin = Math.round(capMin * 1.12);
+    if (is_recovery_day) capMin = Math.round(capMin * 0.55);
+    if (burnoutRisk && !is_recovery_day) capMin = Math.round(capMin * 0.85);
 
     const slots = buildDaySlots(style, isWeekend);
     const blocks: SmartBlock[] = [];
     let order = 0;
 
-    // 1) Deep focus block first — morning
+    // 1) Deep focus in the highest-energy hour
     if (!is_recovery_day && capMin >= focus) {
       const topSub = rankSubjects(
         analysis.per_subject.filter((s) => (remaining[s.subject_name] || 0) > 0),
         analysis.days_left,
       )[0];
       if (topSub) {
-        const alloc = allocateBlock(slots, focus);
+        // Prefer top-energy hour that still has room in slots
+        const preferredHour = bestHours[0]?.hour;
+        const alloc = allocateBlockNearHour(slots, focus, preferredHour) || allocateBlock(slots, focus);
         const block: SmartBlock = {
           subject_input_id: topSub.subject_input_id,
           subject_name: topSub.subject_name,
@@ -108,7 +128,9 @@ export function buildFullPlan(
           block_order: order++,
           suggested_start_time: alloc?.start,
           suggested_end_time: alloc?.end,
-          rationale: `${topSub.subject_name} بالاترین اولویت روزانه — تمرکز عمیق صبحگاهی`,
+          rationale:
+            `${topSub.subject_name} بالاترین اولویت امروزه · قرار داده شده در پیک انرژی تو ` +
+            `(${alloc?.start || "—"}) تا تمرکز عمیق واقعی داشته باشی.`,
         };
         blocks.push(block);
         remaining[topSub.subject_name] -= focus;
@@ -168,8 +190,11 @@ export function buildFullPlan(
       capMin -= simMin;
     }
 
-    // 4) Fill remaining capacity with next-priority study blocks — with diversity
+    // 4) Fill remaining capacity with balanced ratio
     let lastSubject: string | null = null;
+    let studyDone = focus > 0 && !is_recovery_day ? focus : 0;
+    let testDone = 0;
+    let reviewDone = todayReviews.slice(0, 2).reduce((a) => a + 30, 0);
     while (capMin >= 25) {
       const list = rankSubjects(
         analysis.per_subject.filter(
@@ -181,8 +206,18 @@ export function buildFullPlan(
       const s = list[0];
       const want = Math.min(focus, remaining[s.subject_name], capMin);
       if (want < 20) break;
+      const totalSoFar = studyDone + testDone + reviewDone || 1;
+      const pctStudy = (studyDone / totalSoFar) * 100;
+      const pctTest = (testDone / totalSoFar) * 100;
+      // Pick block type by deficit vs ratio
+      let chosen: BlockType = "study";
+      const deficits = {
+        study: ratio.study - pctStudy,
+        test: ratio.test - pctTest,
+      };
+      if (deficits.test > deficits.study && phase !== "foundation") chosen = "test";
       const alloc = allocateBlock(slots, want);
-      const isTestBlock = order % 3 === 2;
+      const isTestBlock = chosen === "test";
       blocks.push({
         subject_input_id: s.subject_input_id,
         subject_name: s.subject_name,
@@ -196,11 +231,14 @@ export function buildFullPlan(
         suggested_start_time: alloc?.start,
         suggested_end_time: alloc?.end,
         rationale: isTestBlock
-          ? `${s.subject_name}: بلوک تست‌زنی برای تثبیت`
-          : `${s.subject_name}: ادامه پوشش با اولویت متوسط`,
+          ? `${s.subject_name}: تست‌زنی برای تثبیت — تعادل نسبت تست/مطالعه (${ratio.test}٪ هدف).`
+          : `${s.subject_name}: ادامه پوشش با اولویت متوسط. ${
+              alloc ? `شروع ${alloc.start} برای ماکزیمم تمرکز.` : ""
+            }`,
       });
       remaining[s.subject_name] -= want;
       capMin -= want + 10;
+      if (isTestBlock) testDone += want; else studyDone += want;
       lastSubject = s.subject_name;
     }
 
@@ -208,7 +246,15 @@ export function buildFullPlan(
       (a, b) => a + b.study_minutes + b.review_minutes + b.recovery_minutes,
       0,
     );
+    loadHistory.push(totalPlanned);
     const heat = Math.min(1, totalPlanned / Math.max(60, dailyCapacityMinutes(style, isWeekend)));
+    const dayRationale = is_simulation_day
+      ? `روز شبیه‌ساز · ${blocks.length} بلوک · شدت ${(heat * 100).toFixed(0)}٪ · شرایط آزمون واقعی`
+      : is_recovery_day
+      ? `روز ریکاوری · بار سبک برای بازیابی ذهنی${burnoutRisk ? " (تشخیص خستگی هفتگی)" : ""}`
+      : `فاز ${phase} · ${blocks.length} بلوک · شدت ${(heat * 100).toFixed(0)}٪${
+          burnoutRisk ? " · کاهش ۱۵٪ به‌خاطر بار هفته" : ""
+        }`;
 
     daily.push({
       date: dateStr,
@@ -223,7 +269,7 @@ export function buildFullPlan(
         : `${goalForPhase(phase)}`,
       total_planned_minutes: totalPlanned,
       blocks,
-      rationale: `فاز ${phase} · ${blocks.length} بلوک · شدت ${(heat * 100).toFixed(0)}٪`,
+      rationale: dayRationale,
     });
   }
 
