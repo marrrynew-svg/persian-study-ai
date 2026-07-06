@@ -120,13 +120,25 @@ export function useBuildPlanV3() {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (!exam) throw new Error("هیچ آزمون فعالی نیست");
+      if (!exam) {
+        const err: any = new Error("هنوز آزمونی ثبت نکردی — بریم مشاور هوشمند");
+        err.code = "NO_EXAM";
+        throw err;
+      }
       const [{ data: subs }, { data: style }, { data: wiz }] = await Promise.all([
         sb.from("plan_subject_inputs").select("*").eq("user_id", user.id).eq("exam_setup_id", exam.id),
         sb.from("plan_study_style").select("*").eq("user_id", user.id).maybeSingle(),
         sb.from("plan_wizard_state").select("answers").eq("user_id", user.id).maybeSingle(),
       ]);
-      if (!subs?.length || !style) throw new Error("اطلاعات ورودی ناقص است");
+      if (!subs?.length || !style) {
+        const err: any = new Error(
+          !subs?.length
+            ? "دروسی برای این آزمون ثبت نشده — بریم مشاور هوشمند"
+            : "سبک مطالعه‌ات ثبت نشده — بریم مشاور هوشمند",
+        );
+        err.code = "INCOMPLETE_WIZARD";
+        throw err;
+      }
       const analysis = runAnalysis(
         { id: exam.id, exam_name: exam.exam_name, exam_type: exam.exam_type, exam_date: exam.exam_date, exam_time: exam.exam_time },
         subs as any,
