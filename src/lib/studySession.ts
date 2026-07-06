@@ -35,6 +35,14 @@ export const normalizeStudySession = (session: StudySessionInput) => {
     Math.round(session.duration_seconds ?? secondsBetween(session.started_at, session.ended_at)),
   );
   const mode = session.mode || session.session_type || "timer";
+  const rawSessionType = session.session_type || mode;
+  const sessionType = ["pomodoro", "custom", "focus"].includes(rawSessionType)
+    ? rawSessionType
+    : mode === "focus"
+    ? "focus"
+    : mode === "pomodoro"
+    ? "pomodoro"
+    : "custom";
 
   return {
     subject_id: session.subject_id || null,
@@ -43,7 +51,7 @@ export const normalizeStudySession = (session: StudySessionInput) => {
     duration_seconds: durationSeconds,
     duration_minutes: session.duration_minutes ?? minutesFromSeconds(durationSeconds),
     mode,
-    session_type: session.session_type || mode,
+    session_type: sessionType,
     source: session.source || (mode === "manual" ? "manual" : "timer"),
     client_session_id: session.client_session_id || createClientSessionId(),
     completed: session.completed ?? true,

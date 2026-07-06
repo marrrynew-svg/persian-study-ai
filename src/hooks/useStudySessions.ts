@@ -12,7 +12,8 @@ async function syncQueuedStudySessions(userId: string) {
   const queued = await getQueuedStudySessions(userId);
   for (const session of queued) {
     const { retry_count, queued_at, last_error, ...payload } = session;
-    const { error } = await supabase.from("study_sessions").insert(payload);
+    const safePayload = { ...normalizeStudySession(payload), user_id: userId };
+    const { error } = await supabase.from("study_sessions").insert(safePayload);
     if (error) {
       if (error.code === "23505") {
         await removeQueuedStudySession(session.client_session_id);

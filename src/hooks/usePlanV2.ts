@@ -10,6 +10,12 @@ import { toast } from "sonner";
 
 const sb: any = supabase;
 
+const ymd = (d: Date) => d.toISOString().slice(0, 10);
+
+function isPastExam(date?: string | null) {
+  return !!date && date < ymd(new Date());
+}
+
 /* ---------------- Wizard state ---------------- */
 export function useWizardState() {
   const { user } = useAuth();
@@ -91,6 +97,9 @@ export function useFinalizeWizard() {
   return useMutation({
     mutationFn: async (input: { exam: ExamSetup; subjects: SubjectInput[]; style: StudyStyle; ext?: StudyStyleExt }) => {
       if (!user) throw new Error("no auth");
+      if (isPastExam(input.exam.exam_date)) throw new Error("تاریخ آزمون گذشته؛ لطفاً تاریخ هدف جدید وارد کن");
+      const validSubjects = input.subjects.filter((s) => s.subject_name.trim());
+      if (!validSubjects.length) throw new Error("حداقل یک درس معتبر وارد کن");
       // Deactivate previous
       await sb.from("plan_exam_setup").update({ is_active: false }).eq("user_id", user.id);
       const { data: examRow, error: examErr } = await sb
@@ -108,7 +117,7 @@ export function useFinalizeWizard() {
       if (examErr) throw examErr;
 
       // Subjects
-      const subsPayload = input.subjects.map((s, idx) => ({
+      const subsPayload = validSubjects.map((s, idx) => ({
         user_id: user.id,
         exam_setup_id: examRow.id,
         subject_name: s.subject_name,
@@ -137,7 +146,7 @@ export function useFinalizeWizard() {
       // Analyze
       const analysis = runAnalysis(
         { ...input.exam, id: examRow.id },
-        input.subjects,
+        validSubjects,
         input.style,
       );
       await sb.from("plan_analysis").insert({
@@ -153,7 +162,7 @@ export function useFinalizeWizard() {
 
       // Build v3 smart plan (30-day horizon) with extended prefs
       const plan = buildFullPlan(analysis, input.style, { horizonDays: 30, ext: input.ext });
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayStr = ymd(new Date());
       // Wipe future daily+weekly+monthly
       const { data: futureDays } = await sb
         .from("plan_daily_v2").select("id").eq("user_id", user.id).gte("date", todayStr);
@@ -162,13 +171,13 @@ export function useFinalizeWizard() {
         await sb.from("plan_block_v2").delete().in("daily_id", fids);
         await sb.from("plan_daily_v2").delete().in("id", fids);
       }
-      await sb.from("plan_weekly_v2").delete().eq("user_id", user.id).gte("week_start", todayStr);
-      await sb.from("plan_monthly_v2").delete().eq("user_id", user.id).gte("month_start", todayStr);
+      await sb.from("plan_weekly_v2").delete().eq("user_id", user.id).gte("week_end", todayStr);
+      await sb.from("plan_monthly_v2").delete().eq("user_id", user.id);
 
       for (const d of plan.daily) {
         const { data: dayRow, error: dayErr } = await sb
           .from("plan_daily_v2")
-          .insert({
+            .upsert({
             user_id: user.id,
             exam_setup_id: examRow.id,
             date: d.date,
@@ -180,12 +189,13 @@ export function useFinalizeWizard() {
             is_simulation_day: d.is_simulation_day,
             is_recovery_day: d.is_recovery_day,
             day_goal: d.day_goal,
-          })
+            }, { onConflict: "user_id,date" })
           .select()
           .single();
         if (dayErr) throw dayErr;
+        await sb.from("plan_block_v2").delete().eq("daily_id", dayRow.id);
         if (d.blocks.length) {
-          await sb.from("plan_block_v2").insert(
+          const { error: blockErr } = await sb.from("plan_block_v2").insert(
             d.blocks.map((b) => ({
               user_id: user.id,
               daily_id: dayRow.id,
@@ -205,17 +215,19 @@ export function useFinalizeWizard() {
               rationale: b.rationale || null,
             })),
           );
+          if (blockErr) throw blockErr;
         }
       }
       if (plan.weekly.length) {
-        await sb.from("plan_weekly_v2").insert(plan.weekly.map((w) => ({
+        const { error: weeklyErr } = await sb.from("plan_weekly_v2").insert(plan.weekly.map((w) => ({
           user_id: user.id, exam_setup_id: examRow.id, week_start: w.week_start,
           week_end: w.week_end, week_index: w.week_index, phase: w.phase,
           weekly_goal: w.weekly_goal, target_minutes: w.target_minutes,
           coverage: w.coverage, milestones: w.milestones, rationale: w.rationale,
         })));
+        if (weeklyErr) throw weeklyErr;
       }
-      await sb.from("plan_monthly_v2").insert({
+      const { error: monthlyErr } = await sb.from("plan_monthly_v2").insert({
         user_id: user.id, exam_setup_id: examRow.id,
         month_start: plan.monthly.month_start, month_end: plan.monthly.month_end,
         total_days: plan.monthly.total_days, phases: plan.monthly.phases,
@@ -224,10 +236,11 @@ export function useFinalizeWizard() {
         predicted_readiness_percent: plan.monthly.predicted_readiness_percent,
         rationale: plan.monthly.rationale,
       });
+      if (monthlyErr) throw monthlyErr;
 
       await sb.from("plan_wizard_state").upsert(
         { user_id: user.id, completed: true, current_step: 99,
-          answers: { styleExt: input.ext || {} } },
+          answers: { exam: input.exam, subjects: validSubjects, style: input.style, styleExt: input.ext || {} } },
         { onConflict: "user_id" },
       );
 
