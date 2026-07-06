@@ -2,9 +2,10 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sparkles, RefreshCw, CalendarPlus, Flame, Target } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useLatestAnalysis, useActiveExamSetup } from "@/hooks/usePlanV2";
 import { useDailyV3, useBuildPlanV3 } from "@/hooks/usePlanV3";
+import { toast } from "sonner";
 import { DiagnosisCard } from "@/components/plan/v2/DiagnosisCard";
 import { SmartBlockCard } from "@/components/plan/v3/SmartBlockCard";
 import { DayTimeline } from "@/components/plan/v3/DayTimeline";
@@ -20,10 +21,25 @@ function PhaseBadge({ phase }: { phase: string }) {
 }
 
 export default function SmartToday() {
+  const navigate = useNavigate();
   const { data: exam } = useActiveExamSetup();
   const { data: today, isLoading } = useDailyV3();
   const { data: analysis } = useLatestAnalysis();
   const build = useBuildPlanV3();
+
+  const handleRebuild = () => {
+    build.mutate(
+      {},
+      {
+        onError: (e: any) => {
+          if (e?.code === "NO_EXAM" || e?.code === "INCOMPLETE_WIZARD") {
+            toast.error(e.message);
+            setTimeout(() => navigate("/plan/wizard"), 400);
+          }
+        },
+      },
+    );
+  };
 
   if (!isLoading && !exam) {
     return (
@@ -56,7 +72,7 @@ export default function SmartToday() {
             <h1 className="text-xl font-bold">برنامه امروز</h1>
             <p className="text-xs text-muted-foreground">{exam?.exam_name}</p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => build.mutate({})} disabled={build.isPending}>
+          <Button size="sm" variant="outline" onClick={handleRebuild} disabled={build.isPending}>
             <RefreshCw className={`w-4 h-4 ml-1 ${build.isPending ? "animate-spin" : ""}`} /> بازسازی هوشمند
           </Button>
         </header>
@@ -109,8 +125,20 @@ export default function SmartToday() {
         </Card>
 
         {total === 0 && !isLoading && (
-          <Card className="p-6 text-center rounded-2xl text-sm text-muted-foreground">
-            امروز بلوکی برنامه‌ریزی نشده. روی «بازسازی هوشمند» بزن.
+          <Card className="p-6 text-center rounded-2xl space-y-3">
+            <Sparkles className="w-10 h-10 mx-auto text-primary" />
+            <div className="text-sm font-bold">امروز بلوکی نداری</div>
+            <p className="text-xs text-muted-foreground">
+              با یه کلیک، برنامه حرفه‌ای امروزتو بساز. اگه اطلاعاتت کامل نباشه، خودم می‌برمت مشاور هوشمند.
+            </p>
+            <div className="flex gap-2 justify-center">
+              <Button size="sm" className="gradient-primary text-primary-foreground" onClick={handleRebuild} disabled={build.isPending}>
+                <Sparkles className="w-4 h-4 ml-1" /> ساخت برنامه امروز
+              </Button>
+              <Link to="/plan/wizard">
+                <Button size="sm" variant="outline"><CalendarPlus className="w-4 h-4 ml-1" /> مشاور هوشمند</Button>
+              </Link>
+            </div>
           </Card>
         )}
 
