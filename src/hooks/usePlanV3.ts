@@ -8,29 +8,38 @@ import { toast } from "sonner";
 const sb: any = supabase;
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 
+function isPastExam(date?: string | null) {
+  return !!date && date < ymd(new Date());
+}
+
 /** Persist a full v3 plan (daily + weekly + monthly). Wipes future rows only. */
 async function persistFullPlan(userId: string, examId: string, plan: ReturnType<typeof buildFullPlan>) {
   const today = ymd(new Date());
 
   // Wipe future daily (blocks cascade via delete-per-day, we do manual)
-  const { data: futureDays } = await sb
+  const { data: futureDays, error: readFutureErr } = await sb
     .from("plan_daily_v2")
     .select("id")
     .eq("user_id", userId)
     .gte("date", today);
+  if (readFutureErr) throw readFutureErr;
   const futureIds = (futureDays || []).map((d: any) => d.id);
   if (futureIds.length) {
-    await sb.from("plan_block_v2").delete().in("daily_id", futureIds);
-    await sb.from("plan_daily_v2").delete().in("id", futureIds);
+    const { error: blockDeleteErr } = await sb.from("plan_block_v2").delete().in("daily_id", futureIds);
+    if (blockDeleteErr) throw blockDeleteErr;
+    const { error: dayDeleteErr } = await sb.from("plan_daily_v2").delete().in("id", futureIds);
+    if (dayDeleteErr) throw dayDeleteErr;
   }
-  await sb.from("plan_weekly_v2").delete().eq("user_id", userId).gte("week_start", today);
-  await sb.from("plan_monthly_v2").delete().eq("user_id", userId).gte("month_start", today);
+  const { error: weeklyDeleteErr } = await sb.from("plan_weekly_v2").delete().eq("user_id", userId).gte("week_end", today);
+  if (weeklyDeleteErr) throw weeklyDeleteErr;
+  const { error: monthlyDeleteErr } = await sb.from("plan_monthly_v2").delete().eq("user_id", userId);
+  if (monthlyDeleteErr) throw monthlyDeleteErr;
 
   // Insert daily + blocks
   for (const d of plan.daily) {
     const { data: dayRow, error: dayErr } = await sb
       .from("plan_daily_v2")
-      .insert({
+      .upsert({
         user_id: userId,
         exam_setup_id: examId,
         date: d.date,
@@ -42,10 +51,12 @@ async function persistFullPlan(userId: string, examId: string, plan: ReturnType<
         is_simulation_day: d.is_simulation_day,
         is_recovery_day: d.is_recovery_day,
         day_goal: d.day_goal,
-      })
+      }, { onConflict: "user_id,date" })
       .select()
       .single();
     if (dayErr) throw dayErr;
+    const { error: oldBlocksErr } = await sb.from("plan_block_v2").delete().eq("daily_id", dayRow.id);
+    if (oldBlocksErr) throw oldBlocksErr;
     if (d.blocks.length) {
       const { error: bErr } = await sb.from("plan_block_v2").insert(
         d.blocks.map((b) => ({
@@ -73,7 +84,7 @@ async function persistFullPlan(userId: string, examId: string, plan: ReturnType<
 
   // Weekly
   if (plan.weekly.length) {
-    await sb.from("plan_weekly_v2").insert(
+    const { error: weeklyErr } = await sb.from("plan_weekly_v2").insert(
       plan.weekly.map((w) => ({
         user_id: userId,
         exam_setup_id: examId,
@@ -88,10 +99,11 @@ async function persistFullPlan(userId: string, examId: string, plan: ReturnType<
         rationale: w.rationale,
       })),
     );
+    if (weeklyErr) throw weeklyErr;
   }
 
   // Monthly
-  await sb.from("plan_monthly_v2").insert({
+  const { error: monthlyErr } = await sb.from("plan_monthly_v2").insert({
     user_id: userId,
     exam_setup_id: examId,
     month_start: plan.monthly.month_start,
@@ -104,6 +116,7 @@ async function persistFullPlan(userId: string, examId: string, plan: ReturnType<
     predicted_readiness_percent: plan.monthly.predicted_readiness_percent,
     rationale: plan.monthly.rationale,
   });
+  if (monthlyErr) throw monthlyErr;
 }
 
 export function useBuildPlanV3() {
@@ -123,6 +136,11 @@ export function useBuildPlanV3() {
       if (!exam) {
         const err: any = new Error("هنوز آزمونی ثبت نکردی — بریم مشاور هوشمند");
         err.code = "NO_EXAM";
+        throw err;
+      }
+      if (isPastExam(exam.exam_date)) {
+        const err: any = new Error("تاریخ آزمون قبلی گذشته؛ اول تاریخ هدف جدید رو در مشاور هوشمند ثبت کن");
+        err.code = "EXAM_EXPIRED";
         throw err;
       }
       const [{ data: subs }, { data: style }, { data: wiz }] = await Promise.all([

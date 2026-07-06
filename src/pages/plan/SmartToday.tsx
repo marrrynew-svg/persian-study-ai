@@ -10,6 +10,8 @@ import { DiagnosisCard } from "@/components/plan/v2/DiagnosisCard";
 import { SmartBlockCard } from "@/components/plan/v3/SmartBlockCard";
 import { DayTimeline } from "@/components/plan/v3/DayTimeline";
 
+const isPastDate = (date?: string | null) => !!date && date < new Date().toISOString().slice(0, 10);
+
 function PhaseBadge({ phase }: { phase: string }) {
   const map: Record<string, { label: string; cls: string }> = {
     foundation: { label: "فاز پایه", cls: "bg-blue-500/15 text-blue-600" },
@@ -32,7 +34,7 @@ export default function SmartToday() {
       {},
       {
         onError: (e: any) => {
-          if (e?.code === "NO_EXAM" || e?.code === "INCOMPLETE_WIZARD") {
+          if (e?.code === "NO_EXAM" || e?.code === "INCOMPLETE_WIZARD" || e?.code === "EXAM_EXPIRED") {
             toast.error(e.message);
             setTimeout(() => navigate("/plan/wizard"), 400);
           }
@@ -41,13 +43,13 @@ export default function SmartToday() {
     );
   };
 
-  if (!isLoading && !exam) {
+  if (!isLoading && (!exam || isPastDate(exam.exam_date))) {
     return (
       <AppLayout>
         <div className="px-4 pt-10 max-w-md mx-auto text-center space-y-4">
           <Sparkles className="w-12 h-12 mx-auto text-primary" />
-          <h2 className="text-xl font-bold">برنامه هوشمندت آماده نیست</h2>
-          <p className="text-sm text-muted-foreground">با چند سوال یک برنامه‌ی حرفه‌ای می‌سازم.</p>
+          <h2 className="text-xl font-bold">{exam ? "تاریخ آزمونت گذشته" : "برنامه هوشمندت آماده نیست"}</h2>
+          <p className="text-sm text-muted-foreground">تاریخ هدف و اطلاعاتت رو به‌روز کن تا برنامه روزانه و هفتگی دقیق ساخته بشه.</p>
           <Link to="/plan/wizard">
             <Button className="w-full gradient-primary text-primary-foreground">
               <CalendarPlus className="w-4 h-4 ml-1" /> شروع مشاور هوشمند

@@ -9,6 +9,8 @@ import { WeekGrid } from "@/components/plan/v3/WeekGrid";
 import { SmartBlockCard } from "@/components/plan/v3/SmartBlockCard";
 import { toast } from "sonner";
 
+const isPastDate = (date?: string | null) => !!date && date < new Date().toISOString().slice(0, 10);
+
 export default function SmartWeek() {
   const navigate = useNavigate();
   const { data: exam } = useActiveExamSetup();
@@ -24,7 +26,7 @@ export default function SmartWeek() {
       {},
       {
         onError: (e: any) => {
-          if (e?.code === "NO_EXAM" || e?.code === "INCOMPLETE_WIZARD") {
+          if (e?.code === "NO_EXAM" || e?.code === "INCOMPLETE_WIZARD" || e?.code === "EXAM_EXPIRED") {
             toast.error(e.message);
             setTimeout(() => navigate("/plan/wizard"), 400);
           }
@@ -46,11 +48,11 @@ export default function SmartWeek() {
           </Button>
         </header>
 
-        {!exam && (
+        {(!exam || isPastDate(exam.exam_date)) && (
           <Card className="p-6 text-center rounded-2xl space-y-3">
             <Sparkles className="w-10 h-10 mx-auto text-primary" />
-            <div className="text-sm font-bold">هنوز آزمونی ثبت نکردی</div>
-            <p className="text-xs text-muted-foreground">با مشاور هوشمند شروع کن تا برنامه هفتگی حرفه‌ای بسازم.</p>
+            <div className="text-sm font-bold">{exam ? "تاریخ آزمونت گذشته" : "هنوز آزمونی ثبت نکردی"}</div>
+            <p className="text-xs text-muted-foreground">هدف جدید رو در مشاور هوشمند ثبت کن تا برنامه هفتگی حرفه‌ای بسازم.</p>
             <Link to="/plan/wizard">
               <Button size="sm" className="gradient-primary text-primary-foreground">
                 <CalendarPlus className="w-4 h-4 ml-1" /> شروع مشاور هوشمند
@@ -59,7 +61,7 @@ export default function SmartWeek() {
           </Card>
         )}
 
-        {exam && !hasAnyBlocks && !currentWeek && (
+        {exam && !isPastDate(exam.exam_date) && !hasAnyBlocks && !currentWeek && (
           <Card className="p-6 text-center rounded-2xl space-y-3">
             <Sparkles className="w-10 h-10 mx-auto text-primary" />
             <div className="text-sm font-bold">برنامه هفتگی هنوز ساخته نشده</div>
