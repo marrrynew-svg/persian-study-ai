@@ -240,7 +240,7 @@ export function useFinalizeWizard() {
 
       await sb.from("plan_wizard_state").upsert(
         { user_id: user.id, completed: true, current_step: 99,
-          answers: { styleExt: input.ext || {} } },
+          answers: { exam: input.exam, subjects: validSubjects, style: input.style, styleExt: input.ext || {} } },
         { onConflict: "user_id" },
       );
 
