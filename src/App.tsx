@@ -47,6 +47,7 @@ import SmartToday from "./pages/plan/SmartToday";
 import SmartWeek from "./pages/plan/SmartWeek";
 import SmartMonth from "./pages/plan/SmartMonth";
 import PlanCoach from "./pages/plan/PlanCoach";
+import PlanCommand from "./pages/plan/PlanCommand";
 import { useStudySessionQueueSync } from "@/hooks/useStudySessions";
 import { useEffect } from "react";
 import { forceAIContextRefresh } from "@/lib/aiContextDispatcher";
@@ -107,7 +108,7 @@ function AppRoutes() {
       <Route path="/exams" element={<ProtectedRoute><Exams /></ProtectedRoute>} />
 
       {/* Section hubs — redirect to first sub-route */}
-      <Route path="/plan" element={<Navigate to="/plan/today" replace />} />
+      <Route path="/plan" element={<Navigate to="/plan/command" replace />} />
       <Route path="/study" element={<Navigate to="/timer" replace />} />
       <Route path="/coach" element={<Navigate to="/advisor" replace />} />
       <Route path="/journey" element={<Navigate to="/roadmap" replace />} />
