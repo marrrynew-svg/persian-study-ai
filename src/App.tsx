@@ -115,6 +115,7 @@ function AppRoutes() {
       <Route path="/me" element={<Navigate to="/profile" replace />} />
 
       {/* Smart Planning v2 */}
+      <Route path="/plan/command" element={<ProtectedRoute><PlanCommand /></ProtectedRoute>} />
       <Route path="/plan/wizard" element={<ProtectedRoute><SmartWizard /></ProtectedRoute>} />
       <Route path="/plan/today" element={<ProtectedRoute><SmartToday /></ProtectedRoute>} />
       <Route path="/plan/week" element={<ProtectedRoute><SmartWeek /></ProtectedRoute>} />
